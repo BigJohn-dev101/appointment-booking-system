@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appointment Booking System — Planning & Requirements</title>
+<style>
+  :root{
+    --ink:#152238;
+    --ink-soft:#57677D;
+    --paper:#F6F7F9;
+    --panel:#FFFFFF;
+    --line:#E0E4EA;
+    --accent:#215A56;
+    --accent-soft:#E4EEEC;
+    --amber:#C0752B;
+    --red:#A2453E;
+    --green:#2F7A57;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--ink);
+    font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    overflow:hidden;
+  }
+
+  .deck{ position:relative; width:100vw; height:100vh; }
+
+  .slide{
+    position:absolute; inset:0;
+    display:none;
+    flex-direction:column;
+    background:var(--paper);
+    padding:4.5vh 6vw 9vh 6vw;
+    overflow-y:auto;
+  }
+  .slide.active{display:flex;}
+
+  .eyebrow{
+    font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); font-weight:700; margin-bottom:10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:""; width:22px; height:2px; background:var(--amber); display:inline-block;}
+  h1{font-size:clamp(32px,4.2vw,52px); font-weight:800; margin:0 0 10px 0; color:var(--ink); line-height:1.1;}
+  h2{font-size:clamp(23px,2.6vw,32px); font-weight:800; margin:0 0 6px 0; color:var(--ink); line-height:1.15;}
+  h3{font-size:16.5px; font-weight:700; margin:0 0 8px 0; color:var(--ink);}
+  p{font-size:15.5px; line-height:1.55; color:var(--ink-soft); margin:0 0 10px 0;}
+  .lede{font-size:17px; color:var(--ink-soft); max-width:760px;}
+  ul{margin:0; padding-left:20px;}
+  li{font-size:14.5px; color:var(--ink-soft); line-height:1.6; margin-bottom:6px;}
+
+  .slide-body{flex:1; display:flex; flex-direction:column; justify-content:center; gap:18px; max-width:1180px; margin:0 auto; width:100%;}
+
+  /* ---- Title slide ---- */
+  #slide-1{background:var(--ink); align-items:center; justify-content:center; text-align:center;}
+  #slide-1 .eyebrow{color:#9FC2BB; justify-content:center;}
+  #slide-1 h1{color:#fff; max-width:820px;}
+  #slide-1 .sub{color:#B9C5D6; font-size:22px; margin-bottom:20px;}
+  #slide-1 .overview{
+    max-width:640px; color:#DCE3EC; font-size:16px; border-top:1px solid rgba(255,255,255,.18);
+    padding-top:22px; margin-top:10px;
+  }
+
+  /* ---- Generic card ---- */
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 22px;}
+
+  /* ---- Problem flow ---- */
+  .flow-vert{display:flex; flex-direction:column; align-items:flex-start; gap:0;}
+  .flow-vert .node{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; color:var(--ink);}
+  .flow-vert .down{color:var(--line); font-size:18px; padding:2px 0 2px 20px;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start;}
+  .problem-list{display:flex; flex-direction:column; gap:8px;}
+  .problem-list .item{display:flex; gap:10px; align-items:flex-start; font-size:14.5px; color:var(--ink-soft);}
+  .problem-list .item .dot{color:var(--red); font-weight:800; flex-shrink:0;}
+
+  /* ---- Affected / challenge cards ---- */
+  .affected-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .affected-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px 20px;}
+  .affected-card .icon{font-size:24px;}
+  .affected-card h3{margin:8px 0 8px 0; color:var(--accent);}
+  .affected-card p{font-size:13.5px; margin:0;}
+
+  /* ---- Architecture ---- */
+  .arch{display:flex; flex-direction:column; align-items:center; gap:0; margin:4px 0 4px 0;}
+  .arch .tier{background:var(--accent); color:#fff; font-weight:700; font-size:15px; padding:11px 28px; border-radius:8px; letter-spacing:.02em;}
+  .arch .tier.sub{background:var(--panel); color:var(--ink); border:1.5px solid var(--accent); font-weight:600;}
+  .arch .down{color:var(--ink-soft); font-size:20px; padding:2px 0;}
+  .steps-row{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; margin:6px 0;}
+  .steps-row .step{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:8px 16px; font-size:13.5px; font-weight:600; color:var(--ink);}
+  .steps-row .arrow{color:var(--line); font-size:15px;}
+
+  /* ---- Scope / assumptions ---- */
+  .scope-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  .scope-box{border-radius:10px; padding:16px 20px;}
+  .scope-box.in{background:#EAF4EE; border:1px solid #BFE0CB;}
+  .scope-box.out{background:#F6EAE9; border:1px solid #E3BFBC;}
+  .scope-box h3{margin-bottom:10px;}
+  .scope-box.in h3{color:var(--green);}
+  .scope-box.out h3{color:var(--red);}
+  .scope-box ul{list-style:none; padding:0; display:flex; flex-direction:column; gap:6px;}
+  .scope-box.in li::before{content:"✓  "; color:var(--green); font-weight:800;}
+  .scope-box.out li::before{content:"✗  "; color:var(--red); font-weight:800;}
+  .scope-box li{font-size:13.5px; color:var(--ink);}
+  .assumption-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:2px;}
+  .assumption-row .a{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:7px 14px; font-size:12.5px; font-weight:600; color:var(--ink-soft);}
+
+  /* ---- roles ---- */
+  .role-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  .role-card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 22px;}
+  .role-card .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); background:var(--accent-soft); padding:5px 12px; border-radius:20px; margin-bottom:14px;}
+  .role-card ul{list-style:none; padding:0; display:flex; flex-direction:column; gap:7px;}
+  .role-card li{font-size:13.5px; color:var(--ink-soft);}
+  .role-card li::before{content:"→ "; color:var(--amber); font-weight:700;}
+  .note-strip{text-align:center; font-size:14px; color:var(--ink-soft); font-style:italic; margin-top:2px;}
+
+  /* ---- requirements ---- */
+  .req-two{display:grid; grid-template-columns:1fr 1.1fr; gap:32px; align-items:start;}
+  .rule-flow{display:flex; flex-direction:column; gap:0; align-items:stretch;}
+  .rule-flow .rnode{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; text-align:center;}
+  .rule-flow .rdown{text-align:center; color:var(--line); font-size:15px; padding:0;}
+  .decision-split{display:flex; gap:10px; margin-top:2px;}
+  .decision-split div{flex:1; border-radius:8px; padding:7px 10px; font-size:12px; font-weight:700; text-align:center;}
+  .decision-split .no{background:#F6EAE9; color:var(--red); border:1px solid #E3BFBC;}
+  .decision-split .yes{background:#EAF4EE; color:var(--green); border:1px solid #BFE0CB;}
+  .callout{background:var(--ink); color:#fff; border-radius:8px; padding:12px 18px; font-size:13.5px; font-weight:600; text-align:center; margin-top:10px;}
+
+  /* ---- user story cards (AS A / I WANT TO / SO THAT) ---- */
+  .story-intro{font-size:14.5px; color:var(--ink-soft); max-width:820px; margin-bottom:2px;}
+  .story-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .ustory{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:16px 18px; display:flex; flex-direction:column; gap:8px;}
+  .ustory .title{font-size:12px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--amber);}
+  .ustory .row{font-size:13px;}
+  .ustory .row .k{font-size:10.5px; font-weight:800; letter-spacing:.07em; color:var(--accent); display:block; margin-bottom:2px;}
+  .ustory .row p{margin:0; color:var(--ink); font-size:13px; line-height:1.45;}
+  .ustory .connector{text-align:center; color:var(--line); font-size:13px;}
+
+  /* ---- acceptance criteria slide ---- */
+  .ac-top{display:grid; grid-template-columns:1fr 1.3fr; gap:30px; align-items:start;}
+  .gwt{display:flex; flex-direction:column; gap:10px;}
+  .gwt .box{border-radius:8px; padding:12px 16px; background:var(--panel); border:1px solid var(--line);}
+  .gwt .k{font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--accent); margin-bottom:4px;}
+  .gwt p{font-size:13px; margin:0; color:var(--ink);}
+  .edge-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px;}
+  .edge-card{background:#FBF1E6; border:1px solid var(--amber); border-radius:8px; padding:11px 14px;}
+  .edge-card .t{font-size:12.5px; font-weight:800; color:#7A4A1C; margin-bottom:3px;}
+  .edge-card .d{font-size:12px; color:#7A4A1C; margin:0; opacity:.85;}
+  .foot-note{text-align:center; font-size:13.5px; color:var(--ink-soft); font-style:italic; margin-top:6px;}
+
+  /* ---- flows ---- */
+  .bigflow{display:flex; flex-direction:column; align-items:center; gap:0;}
+  .bigflow .fnode{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 18px; font-size:13px; font-weight:600; color:var(--ink); min-width:220px; text-align:center;}
+  .bigflow .fnode.start,.bigflow .fnode.end{background:var(--ink); color:#fff; border-color:var(--ink); font-weight:700;}
+  .bigflow .fdown{color:var(--line); font-size:14px; padding:0;}
+  .bigflow .decision{background:#FBF1E6; border:1px solid var(--amber); color:#7A4A1C;}
+  .validate-box{background:var(--accent-soft); border:1px solid var(--accent); border-radius:8px; padding:8px 16px; font-size:12px; color:var(--accent); text-align:left; min-width:220px;}
+  .validate-box ul{margin:2px 0 0 16px; padding:0;}
+  .validate-box li{font-size:12px; color:var(--accent); margin-bottom:2px;}
+  .branch{display:flex; gap:20px; align-items:flex-start; margin:2px 0;}
+  .branch .b{display:flex; flex-direction:column; align-items:center; gap:0;}
+  .branch .blabel{font-size:11px; font-weight:800; margin-bottom:2px;}
+  .branch .no .blabel{color:var(--red);}
+  .branch .yes .blabel{color:var(--green);}
+  .flow-main-row{display:grid; grid-template-columns:1.3fr 1fr; gap:30px; align-items:start;}
+  .mini-flows{display:flex; flex-direction:column; gap:22px;}
+  .mini-flow h3{color:var(--accent); font-size:14.5px; margin-bottom:8px;}
+  .mini-steps{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .mini-steps .ms{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--ink);}
+  .mini-steps .ar{color:var(--line); font-size:13px;}
+
+  /* ---- summary ---- */
+  #slide-12{background:var(--ink);}
+  #slide-12 .eyebrow{color:#9FC2BB;}
+  #slide-12 h2{color:#fff;}
+  #slide-12 p, #slide-12 li{color:#C9D1DC;}
+  .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:34px; align-items:start;}
+  .mvp-list{list-style:none; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .mvp-list li{font-size:14.5px; color:#E4E9F0;}
+  .mvp-list li::before{content:"✓  "; color:#7FC79A; font-weight:800;}
+  .next-flow{display:flex; flex-direction:column; gap:0; align-items:stretch;}
+  .next-flow .nnode{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:10px 18px; font-size:13.5px; font-weight:600; color:#fff; text-align:center;}
+  .next-flow .ndown{text-align:center; color:rgba(255,255,255,.35); font-size:15px;}
+  .closing{margin-top:14px; text-align:center; font-size:15.5px; font-weight:600; color:#fff; border-top:1px solid rgba(255,255,255,.18); padding-top:14px;}
+
+  /* ---- nav ---- */
+  .nav{
+    position:fixed; bottom:0; left:0; right:0; height:60px;
+    background:var(--panel); border-top:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 6vw; z-index:10;
+  }
+  .nav button{
+    font-family:inherit; font-size:14px; font-weight:700; color:var(--ink);
+    background:var(--paper); border:1px solid var(--line); border-radius:6px;
+    padding:9px 18px; cursor:pointer; transition:background .15s;
+  }
+  .nav button:hover{background:var(--accent-soft); border-color:var(--accent);}
+  .nav button:disabled{opacity:.35; cursor:default; background:var(--paper);}
+  .nav .counter{font-size:13.5px; color:var(--ink-soft); font-weight:600; letter-spacing:.03em;}
+  .nav .dots{display:flex; gap:5px; flex-wrap:wrap; max-width:340px; justify-content:center;}
+  .nav .dots span{width:7px; height:7px; border-radius:50%; background:var(--line); display:inline-block;}
+  .nav .dots span.on{background:var(--accent);}
+
+  @media (max-width:820px){
+    .two-col,.req-two,.scope-grid,.role-grid,.affected-grid,.story-grid,.ac-top,.edge-grid,.summary-grid,.flow-main-row{grid-template-columns:1fr;}
+    .slide{padding:4vh 5vw 9vh 5vw;}
+  }
+</style>
+</head>
+<body>
+
+<div class="deck">
+
+  <!-- SLIDE 1 — TITLE -->
+  <section class="slide active" id="slide-1">
+    <div class="slide-body">
+      <div class="eyebrow">Planning Phase Presentation</div>
+      <h1>Appointment Booking System</h1>
+      <div class="sub">Planning &amp; Requirements Presentation</div>
+      <p class="overview">A centralised appointment booking system for one service-based business with multiple services and service providers.</p>
+    </div>
+  </section>
+
+  <!-- SLIDE 2 — THE CLIENT'S PROBLEM -->
+  <section class="slide" id="slide-2">
+    <div class="slide-body">
+      <div class="eyebrow">01 — The Client's Problem</div>
+      <h2>Manual scheduling breaks down as the business grows</h2>
+      <div class="two-col">
+        <div class="flow-vert">
+          <div class="node">Customer</div>
+          <div class="down">↓</div>
+          <div class="node">Calls / Messages</div>
+          <div class="down">↓</div>
+          <div class="node">Manual Availability Checking</div>
+          <div class="down">↓</div>
+          <div class="node">Manual Appointment Management</div>
+        </div>
+        <div class="problem-list">
+          <div class="item"><span class="dot">✗</span>Fragmented communication</div>
+          <div class="item"><span class="dot">✗</span>Increased administrative workload</div>
+          <div class="item"><span class="dot">✗</span>Human error</div>
+          <div class="item"><span class="dot">✗</span>Scheduling conflicts</div>
+          <div class="item"><span class="dot">✗</span>Double bookings</div>
+          <div class="item"><span class="dot">✗</span>Difficulty managing growth</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 3 — PEOPLE AFFECTED & CURRENT CHALLENGES -->
+  <section class="slide" id="slide-3">
+    <div class="slide-body">
+      <div class="eyebrow">02 — People Affected &amp; Current Challenges</div>
+      <h2>The problem touches every part of the business</h2>
+      <div class="affected-grid">
+        <div class="affected-card">
+          <div class="icon">👤</div>
+          <h3>Customers</h3>
+          <p>Delayed confirmations, no real-time visibility into availability, and no easy way to view or cancel their own appointments.</p>
+        </div>
+        <div class="affected-card">
+          <div class="icon">🧑‍💼</div>
+          <h3>Service Providers</h3>
+          <p>Disrupted workdays managing admin tasks, risk of double bookings, and no consolidated view of their daily schedule.</p>
+        </div>
+        <div class="affected-card">
+          <div class="icon">🗂️</div>
+          <h3>Administrators</h3>
+          <p>Difficulty overseeing operations, staff assignments, schedule optimisation, and preventing conflicts business-wide.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 4 — PROPOSED SOLUTION & ARCHITECTURE -->
+  <section class="slide" id="slide-4">
+    <div class="slide-body">
+      <div class="eyebrow">03 — Our Proposed Solution &amp; Architecture</div>
+      <h2>One business. Multiple services and providers.</h2>
+      <div class="arch">
+        <div class="tier">ONE BUSINESS</div>
+        <div class="down">↓</div>
+        <div class="tier sub">MULTIPLE SERVICES</div>
+        <div class="down">↓</div>
+        <div class="tier sub">MULTIPLE SERVICE PROVIDERS</div>
+        <div class="down">↓</div>
+        <div class="tier">CUSTOMER APPOINTMENTS</div>
+      </div>
+      <div class="steps-row">
+        <div class="step">1. Select a service</div>
+        <div class="arrow">→</div>
+        <div class="step">2. Select an eligible provider</div>
+        <div class="arrow">→</div>
+        <div class="step">3. Select an available time</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 5 — MVP SCOPE & KEY ASSUMPTIONS -->
+  <section class="slide" id="slide-5">
+    <div class="slide-body">
+      <div class="eyebrow">04 — MVP Scope &amp; Key Assumptions</div>
+      <h2>What we are — and aren't — building</h2>
+      <div class="scope-grid">
+        <div class="scope-box in">
+          <h3>In Scope</h3>
+          <ul>
+            <li>One business</li>
+            <li>Multiple services</li>
+            <li>Multiple providers</li>
+            <li>Provider availability</li>
+            <li>Appointment booking</li>
+            <li>Role-based access</li>
+          </ul>
+        </div>
+        <div class="scope-box out">
+          <h3>Out of Scope</h3>
+          <ul>
+            <li>Marketplace</li>
+            <li>Multiple independent businesses</li>
+            <li>Payments</li>
+            <li>Advanced analytics</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-top:6px;">Key Assumptions</h3>
+        <div class="assumption-row">
+          <div class="a">Fixed service durations</div>
+          <div class="a">No online payments in MVP</div>
+          <div class="a">Notice period required for cancellation</div>
+          <div class="a">Availability is per individual provider</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 6 — USERS, ROLES & RESPONSIBILITIES -->
+  <section class="slide" id="slide-6">
+    <div class="slide-body">
+      <div class="eyebrow">05 — Users, Roles &amp; Responsibilities</div>
+      <h2>Three roles, clearly separated</h2>
+      <div class="role-grid">
+        <div class="role-card">
+          <span class="tag">Customer</span>
+          <ul>
+            <li>Browse services</li>
+            <li>Select providers</li>
+            <li>Book appointments</li>
+            <li>Manage own appointments</li>
+          </ul>
+        </div>
+        <div class="role-card">
+          <span class="tag">Service Provider</span>
+          <ul>
+            <li>Manage own availability</li>
+            <li>Block unavailable time</li>
+            <li>View assigned appointments</li>
+            <li>Update appointment status</li>
+          </ul>
+        </div>
+        <div class="role-card">
+          <span class="tag">Administrator</span>
+          <ul>
+            <li>Manage services</li>
+            <li>Manage providers</li>
+            <li>Associate providers with services</li>
+            <li>Oversee appointments</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note-strip">Each role has different permissions and access to information.</div>
+    </div>
+  </section>
+
+  <!-- SLIDE 7 — KEY SYSTEM REQUIREMENTS -->
+  <section class="slide" id="slide-7">
+    <div class="slide-body">
+      <div class="eyebrow">06 — Key System Requirements</div>
+      <h2>What the system must enforce</h2>
+      <div class="req-two">
+        <div>
+          <h3>Functional Requirements</h3>
+          <ul>
+            <li>Authentication and role-based access</li>
+            <li>Service management</li>
+            <li>Provider management</li>
+            <li>Provider availability</li>
+            <li>Appointment booking</li>
+            <li>Cancellation and rescheduling</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Critical Booking Rule</h3>
+          <div class="rule-flow">
+            <div class="rnode">Service</div>
+            <div class="rdown">↓</div>
+            <div class="rnode">Eligible Provider</div>
+            <div class="rdown">↓</div>
+            <div class="rnode">Provider Availability</div>
+            <div class="rdown">↓</div>
+            <div class="rnode">Blocked Time</div>
+            <div class="rdown">↓</div>
+            <div class="rnode">Existing Appointments</div>
+            <div class="rdown">↓</div>
+            <div class="rnode">Available?</div>
+          </div>
+          <div class="decision-split">
+            <div class="no">NO → Show feedback</div>
+            <div class="yes">YES → Create appointment</div>
+          </div>
+        </div>
+      </div>
+      <div class="callout">The same service provider cannot have overlapping appointments.</div>
+    </div>
+  </section>
+
+  <!-- SLIDE 8 — USER STORIES: CUSTOMER PERSPECTIVE -->
+  <section class="slide" id="slide-8">
+    <div class="slide-body">
+      <div class="eyebrow">07 — User Stories: Customer Perspective</div>
+      <h2>Translating requirements into user goals</h2>
+      <p class="story-intro">User stories describe system requirements from the perspective and goals of real users.</p>
+      <div class="story-grid">
+        <div class="ustory">
+          <div class="title">View Availability</div>
+          <div class="row"><span class="k">As a</span><p>Customer</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>view available appointment times</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>I can choose a suitable time.</p></div>
+        </div>
+        <div class="ustory">
+          <div class="title">Book an Appointment</div>
+          <div class="row"><span class="k">As a</span><p>Customer</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>book an appointment with an eligible service provider</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>I can reserve a suitable time for the service I need.</p></div>
+        </div>
+        <div class="ustory">
+          <div class="title">Manage an Appointment</div>
+          <div class="row"><span class="k">As a</span><p>Customer</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>view and manage my upcoming appointments</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>I can cancel or reschedule an appointment when necessary.</p></div>
+        </div>
+      </div>
+      <div class="foot-note">User stories help the team understand features from the user's perspective and focus development on user goals.</div>
+    </div>
+  </section>
+
+  <!-- SLIDE 9 — USER STORIES: PROVIDER & ADMINISTRATOR PERSPECTIVE -->
+  <section class="slide" id="slide-9">
+    <div class="slide-body">
+      <div class="eyebrow">08 — User Stories: Provider &amp; Administrator Perspective</div>
+      <h2>The system serves more than just customers</h2>
+      <div class="story-grid">
+        <div class="ustory">
+          <div class="title">Service Provider</div>
+          <div class="row"><span class="k">As a</span><p>Service Provider</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>manage my working availability</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>customers can only book appointments when I am available.</p></div>
+        </div>
+        <div class="ustory">
+          <div class="title">Service Provider</div>
+          <div class="row"><span class="k">As a</span><p>Service Provider</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>view appointments assigned to me</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>I can manage my schedule effectively.</p></div>
+        </div>
+        <div class="ustory">
+          <div class="title">Administrator</div>
+          <div class="row"><span class="k">As an</span><p>Administrator</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>manage services and service providers</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>the appointment system accurately reflects the business.</p></div>
+        </div>
+      </div>
+      <div class="foot-note">Each user story directly informs the functional requirements and features that will be developed.</div>
+    </div>
+  </section>
+
+  <!-- SLIDE 10 — ACCEPTANCE CRITERIA & EDGE CASES -->
+  <section class="slide" id="slide-10">
+    <div class="slide-body">
+      <div class="eyebrow">09 — Acceptance Criteria &amp; Edge Cases</div>
+      <h2>How we know a story is done</h2>
+      <p class="story-intro">Acceptance criteria define how the team determines whether a user story has been successfully implemented — using the Customer Booking story as the example.</p>
+      <div class="ac-top">
+        <div class="ustory">
+          <div class="title">Customer Booking</div>
+          <div class="row"><span class="k">As a</span><p>Customer</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">I want to</span><p>book an available appointment</p></div>
+          <div class="connector">↓</div>
+          <div class="row"><span class="k">So that</span><p>I can reserve a suitable time.</p></div>
+        </div>
+        <div class="gwt">
+          <div class="box"><div class="k">GIVEN</div><p>A customer has selected a service and an eligible service provider.</p></div>
+          <div class="box"><div class="k">WHEN</div><p>The customer selects an available appointment time and confirms the booking.</p></div>
+          <div class="box"><div class="k">THEN</div><p>The system creates the appointment and displays confirmation.</p></div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-top:4px;">Important Edge Cases</h3>
+        <div class="edge-grid">
+          <div class="edge-card"><div class="t">⚠ Slot Becomes Unavailable</div><p class="d">The system prevents the booking and asks the customer to choose another time.</p></div>
+          <div class="edge-card"><div class="t">⚠ Invalid Information</div><p class="d">The system displays validation feedback.</p></div>
+          <div class="edge-card"><div class="t">⚠ Unauthorized Access</div><p class="d">Users cannot access information or functionality outside their role.</p></div>
+          <div class="edge-card"><div class="t">⚠ Appointment Conflict</div><p class="d">The system prevents overlapping appointments for the same provider.</p></div>
+        </div>
+      </div>
+      <div class="foot-note">Acceptance criteria make requirements testable and help define when a feature is complete.</div>
+    </div>
+  </section>
+
+  <!-- SLIDE 11 — KEY USER FLOWS -->
+  <section class="slide" id="slide-11">
+    <div class="slide-body">
+      <div class="eyebrow">10 — Key User Flows</div>
+      <h2>Customer Booking Flow</h2>
+      <div class="flow-main-row">
+        <div class="bigflow">
+          <div class="fnode start">START</div>
+          <div class="fdown">↓</div>
+          <div class="fnode">Login / Register</div>
+          <div class="fdown">↓</div>
+          <div class="fnode">Select Service</div>
+          <div class="fdown">↓</div>
+          <div class="fnode">Select Eligible Provider</div>
+          <div class="fdown">↓</div>
+          <div class="fnode">View Available Appointment Times</div>
+          <div class="fdown">↓</div>
+          <div class="fnode">Select Appointment Time</div>
+          <div class="fdown">↓</div>
+          <div class="validate-box">
+            System Validates:
+            <ul>
+              <li>Provider eligibility</li>
+              <li>Working availability</li>
+              <li>Blocked periods</li>
+              <li>Existing appointments</li>
+            </ul>
+          </div>
+          <div class="fdown">↓</div>
+          <div class="fnode decision">Is the Time Available?</div>
+          <div class="branch">
+            <div class="b no">
+              <div class="blabel">NO</div>
+              <div class="fnode" style="min-width:180px;">Display Feedback</div>
+              <div class="fdown">↓</div>
+              <div class="fnode" style="min-width:180px;">Select Another Time</div>
+            </div>
+            <div class="b yes">
+              <div class="blabel">YES</div>
+              <div class="fnode" style="min-width:180px;">Create Appointment</div>
+              <div class="fdown">↓</div>
+              <div class="fnode" style="min-width:180px;">Display Confirmation</div>
+            </div>
+          </div>
+          <div class="fdown">↓</div>
+          <div class="fnode end">END</div>
+        </div>
+        <div class="mini-flows">
+          <div class="mini-flow">
+            <h3>Service Provider Flow</h3>
+            <div class="mini-steps">
+              <div class="ms">Login</div><div class="ar">→</div>
+              <div class="ms">Manage Availability</div><div class="ar">→</div>
+              <div class="ms">Update / Block Time</div><div class="ar">→</div>
+              <div class="ms">Validate</div><div class="ar">→</div>
+              <div class="ms">Save</div>
+            </div>
+          </div>
+          <div class="mini-flow">
+            <h3>Administrator Flow</h3>
+            <div class="mini-steps">
+              <div class="ms">Login</div><div class="ar">→</div>
+              <div class="ms">Manage Services / Providers</div><div class="ar">→</div>
+              <div class="ms">Validate</div><div class="ar">→</div>
+              <div class="ms">Save</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 12 — SUMMARY & NEXT STEPS -->
+  <section class="slide" id="slide-12">
+    <div class="slide-body">
+      <div class="eyebrow">11 — Summary &amp; Next Steps</div>
+      <h2>Our MVP, and what comes next</h2>
+      <div class="summary-grid">
+        <div>
+          <h3 style="color:#fff;">Our MVP</h3>
+          <ul class="mvp-list">
+            <li>One service-based business</li>
+            <li>Multiple services</li>
+            <li>Multiple service providers</li>
+            <li>Provider-specific availability</li>
+            <li>Customer appointment booking and management</li>
+            <li>Role-based access</li>
+            <li>Appointment conflict prevention</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="color:#fff;">Next Step</h3>
+          <div class="next-flow">
+            <div class="nnode">Planning Review</div>
+            <div class="ndown">↓</div>
+            <div class="nnode">Mentor Approval</div>
+            <div class="ndown">↓</div>
+            <div class="nnode">Database Design</div>
+            <div class="ndown">↓</div>
+            <div class="nnode">System Architecture</div>
+            <div class="ndown">↓</div>
+            <div class="nnode">Development</div>
+          </div>
+        </div>
+      </div>
+      <div class="closing">Development begins after planning approval.</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button id="prevBtn" onclick="goTo(current-1)">← Previous</button>
+  <div class="dots" id="dots"></div>
+  <div class="counter" id="counter">1 / 12</div>
+  <button id="nextBtn" onclick="goTo(current+1)">Next →</button>
+</div>
+
+<script>
+  var total = document.querySelectorAll('.slide').length;
+  var current = 1;
+
+  function buildDots(){
+    var dots = document.getElementById('dots');
+    dots.innerHTML = '';
+    for(var i=1;i<=total;i++){
+      var d = document.createElement('span');
+      d.id = 'dot-'+i;
+      dots.appendChild(d);
+    }
+  }
+
+  function goTo(n){
+    if(n < 1 || n > total) return;
+    document.getElementById('slide-'+current).classList.remove('active');
+    current = n;
+    document.getElementById('slide-'+current).classList.add('active');
+    document.getElementById('counter').textContent = current + ' / ' + total;
+    document.getElementById('prevBtn').disabled = (current === 1);
+    document.getElementById('nextBtn').disabled = (current === total);
+    for(var i=1;i<=total;i++){
+      document.getElementById('dot-'+i).classList.toggle('on', i === current);
+    }
+    document.getElementById('slide-'+current).scrollTop = 0;
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' '){
+      e.preventDefault();
+      goTo(current+1);
+    } else if(e.key === 'ArrowLeft'){
+      e.preventDefault();
+      goTo(current-1);
+    }
+  });
+
+  buildDots();
+  goTo(1);
+</script>
+
+</body>
+</html>
