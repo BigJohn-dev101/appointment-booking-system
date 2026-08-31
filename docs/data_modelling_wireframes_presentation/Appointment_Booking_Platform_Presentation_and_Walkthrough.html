@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appointment Booking Platform — System Design &amp; Walkthrough</title>
+<style>
+:root{
+  --ink:#111827; --ink-soft:#4B5563; --ink-faint:#9CA3AF;
+  --accent:#5B5BD6; --accent-soft:#EEF0FD;
+  --bg:#F7F8FA; --panel:#FFFFFF; --border:#E5E7EB;
+  --success:#0F7A5C; --success-bg:#E7F6F0;
+  --error:#B3261E; --error-bg:#FCEBEA;
+  --warning:#B45309; --warning-bg:#FDF3E3;
+  --radius:12px; --radius-sm:8px;
+  --shadow:0 1px 2px rgba(17,24,39,0.04);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;}
+body{min-height:100vh;}
+button{font-family:inherit;cursor:pointer;}
+a{color:inherit;text-decoration:none;cursor:pointer;}
+input,select{font-family:inherit;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+.mono{font-family:var(--mono);}
+
+/* ---------- top nav (walkthrough) ---------- */
+.topnav{background:var(--panel);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 24px;justify-content:space-between;flex-shrink:0;}
+.topnav .brand{font-weight:700;font-size:17px;letter-spacing:-0.02em;color:var(--ink);display:flex;align-items:center;gap:8px;cursor:pointer;}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+.topnav-links{display:flex;gap:28px;font-size:14px;color:var(--ink-soft);}
+.topnav-links a{padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav-links a.active{color:var(--ink);font-weight:600;border-bottom-color:var(--accent);}
+.topnav-right{display:flex;align-items:center;gap:14px;}
+.user-chip{display:flex;align-items:center;gap:8px;font-size:13px;}
+.user-chip .name{font-weight:600;line-height:1.1;}
+.user-chip .sub{color:var(--ink-faint);font-size:12px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);border:1px solid var(--border);}
+
+/* ---------- role switcher ---------- */
+.role-bar{background:#0F1420;padding:10px 24px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0;}
+.role-bar .label{color:#8B93A7;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-right:6px;}
+.role-btn{background:transparent;border:1px solid #2A3040;color:#C7CCDA;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:500;}
+.role-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.role-btn:hover{border-color:#4A5064;color:#fff;}
+.role-bar .spacer{flex:1;}
+.ghost-link{color:#8B93A7;font-size:12.5px;border:none;background:transparent;}
+.ghost-link:hover{color:#fff;}
+
+/* ---------- guided banner ---------- */
+.guided-bar{background:var(--accent);color:#fff;padding:10px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0;font-size:13.5px;}
+.guided-bar .step-pill{background:rgba(255,255,255,0.18);padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;}
+.guided-bar .desc{flex:1;}
+.guided-bar button{background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:6px 12px;border-radius:7px;font-size:12.5px;font-weight:600;}
+.guided-bar button:hover{background:rgba(255,255,255,0.28);}
+.guided-bar button.exit{background:transparent;border:none;text-decoration:underline;}
+
+/* ---------- layout shells ---------- */
+.shell{flex:1;display:flex;}
+.center-wrap{flex:1;display:flex;justify-content:center;padding:32px 24px 60px;}
+.container{max-width:880px;width:100%;}
+.container.wide{max-width:1080px;}
+
+.sidebar-shell{flex:1;display:flex;}
+.sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--border);padding:24px 12px;background:var(--panel);}
+.sidebar .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--ink-faint);text-transform:uppercase;padding:0 12px;margin-bottom:8px;}
+.sidebar a.item{display:block;padding:9px 12px;border-radius:8px;font-size:14px;color:var(--ink-soft);font-weight:500;margin-bottom:2px;}
+.sidebar a.item:hover{background:var(--bg);}
+.sidebar a.item.active{background:var(--accent-soft);color:var(--accent);font-weight:600;}
+.content-area{flex:1;padding:32px 36px 60px;overflow:auto;}
+
+/* ---------- typography ---------- */
+h1.page-title{font-size:24px;font-weight:700;letter-spacing:-0.02em;margin:0 0 4px;}
+p.page-sub{color:var(--ink-soft);font-size:14.5px;margin:0 0 28px;}
+h2.section-title{font-size:16px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+.eyebrow-sm{font-size:11px;font-weight:700;letter-spacing:.07em;color:var(--ink-faint);text-transform:uppercase;margin-bottom:6px;}
+
+/* ---------- cards ---------- */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;}
+.card + .card{margin-top:14px;}
+.grid{display:grid;gap:14px;}
+.grid.cols-1{grid-template-columns:1fr;}
+.grid.cols-2{grid-template-columns:1fr 1fr;}
+.grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+.grid.cols-4{grid-template-columns:repeat(4,1fr);}
+.grid.cols-6{grid-template-columns:repeat(6,1fr);}
+@media(max-width:820px){.grid.cols-2,.grid.cols-3,.grid.cols-4,.grid.cols-6{grid-template-columns:1fr;}}
+
+.metric-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.metric-card .val{font-size:26px;font-weight:700;letter-spacing:-0.02em;}
+.metric-card .lbl{font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+
+.select-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:.12s;}
+.select-card:hover{border-color:#C7CCDA;box-shadow:0 2px 8px rgba(17,24,39,0.06);}
+.select-card.selected{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.select-card.disabled{opacity:.5;cursor:not-allowed;}
+.select-card .title-row{display:flex;justify-content:space-between;align-items:center;}
+.select-card .name{font-weight:600;font-size:15px;}
+.select-card .meta{color:var(--ink-soft);font-size:13px;margin-top:3px;}
+.select-card .price{font-weight:700;font-size:15px;}
+
+/* ---------- badges ---------- */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;}
+.badge.confirmed{background:var(--success-bg);color:var(--success);}
+.badge.completed{background:#EEF0FD;color:#3F3FA8;}
+.badge.cancelled{background:#F1F2F4;color:#6B7280;}
+.badge.noshow{background:var(--error-bg);color:var(--error);}
+.badge.active{background:var(--success-bg);color:var(--success);}
+.badge.inactive{background:#F1F2F4;color:#6B7280;}
+.badge.warn{background:var(--warning-bg);color:var(--warning);}
+.badge.info{background:var(--accent-soft);color:var(--accent);}
+
+/* ---------- buttons ---------- */
+.btn{border-radius:8px;padding:9px 16px;font-size:13.5px;font-weight:600;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--ink);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+.btn-accent{background:var(--accent);color:#fff;}
+.btn-accent:hover{opacity:.9;}
+.btn-outline{background:#fff;border-color:var(--border);color:var(--ink);}
+.btn-outline:hover{border-color:var(--accent);}
+.btn-ghost{background:transparent;color:var(--ink-soft);border:none;padding:9px 10px;}
+.btn-ghost:hover{color:var(--ink);}
+.btn-danger-outline{background:#fff;border-color:var(--error-bg);color:var(--error);}
+.btn-danger-outline:hover{background:var(--error-bg);}
+.btn-sm{padding:6px 11px;font-size:12.5px;border-radius:7px;}
+.btn-block{width:100%;justify-content:center;}
+.btn-row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;}
+
+/* ---------- table ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;padding:0 10px 10px;border-bottom:1px solid var(--border);}
+td{padding:12px 10px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+td .sub{color:var(--ink-faint);font-size:12px;}
+
+/* ---------- calendar / time slots ---------- */
+.day-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+.day-btn{flex-shrink:0;width:64px;text-align:center;padding:10px 4px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:12.5px;cursor:pointer;}
+.day-btn .dow{color:var(--ink-faint);font-size:10.5px;text-transform:uppercase;font-weight:700;}
+.day-btn .num{font-size:16px;font-weight:700;margin-top:2px;}
+.day-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
+.day-btn.selected .dow{color:var(--accent);}
+.slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:6px;}
+.slot-btn{padding:10px 6px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:600;text-align:center;cursor:pointer;}
+.slot-btn:hover:not(:disabled){border-color:var(--accent);}
+.slot-btn.selected{background:var(--ink);border-color:var(--ink);color:#fff;}
+.slot-btn.blocked,.slot-btn.booked{background:#F7F8FA;color:var(--ink-faint);border-color:var(--border);cursor:not-allowed;text-decoration:line-through;}
+
+/* ---------- misc ---------- */
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.kv{display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;}
+.kv .k{color:var(--ink-soft);}
+.kv .v{font-weight:600;}
+.banner{border-radius:var(--radius-sm);padding:12px 14px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start;}
+.banner.info{background:var(--accent-soft);color:#3F3FA8;}
+.banner.warn{background:var(--warning-bg);color:var(--warning);}
+.banner.error{background:var(--error-bg);color:var(--error);}
+.banner.success{background:var(--success-bg);color:var(--success);}
+.empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft);}
+.empty-state .icon{font-size:26px;margin-bottom:10px;}
+.empty-state h3{margin:0 0 6px;color:var(--ink);font-size:15.5px;}
+.empty-state p{margin:0;font-size:13.5px;}
+.breadcrumb{font-size:12.5px;color:var(--ink-faint);margin-bottom:14px;}
+.breadcrumb b{color:var(--ink-soft);}
+.footer-note{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-faint);}
+.footer-note a{text-decoration:underline;}
+.checkbox-row{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:6px 0;}
+input[type=text],input[type=time],input[type=date],select{padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13.5px;width:100%;}
+label.field-label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:5px;}
+.field{margin-bottom:12px;}
+
+/* entry screen */
+.hero{text-align:center;padding:64px 24px 20px;}
+.hero h1{font-size:34px;font-weight:700;letter-spacing:-0.03em;margin:0 0 12px;max-width:640px;margin-left:auto;margin-right:auto;}
+.hero p{color:var(--ink-soft);font-size:16px;max-width:520px;margin:0 auto 28px;}
+.role-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:920px;margin:0 auto;padding:0 24px;}
+@media(max-width:820px){.role-grid{grid-template-columns:1fr 1fr;}}
+.role-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:22px 18px;text-align:left;cursor:pointer;}
+.role-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(17,24,39,0.06);}
+.role-card .num{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.05em;margin-bottom:10px;}
+.role-card .t{font-weight:700;font-size:15.5px;margin-bottom:4px;}
+.role-card .d{font-size:13px;color:var(--ink-soft);}
+
+/* ---------- PRESENTATION DECK ---------- */
+.deck-shell{min-height:100vh;display:flex;flex-direction:column;background:var(--bg);}
+.deck-topbar{height:52px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--panel);display:flex;align-items:center;padding:0 20px;gap:16px;}
+.deck-topbar .brand{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+.deck-topbar .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+.deck-topbar .section-label{color:var(--ink-faint);font-size:12.5px;flex:1;text-align:center;}
+.deck-topbar .counter{font-size:12.5px;color:var(--ink-soft);font-weight:600;font-family:var(--mono);}
+.deck-progress{height:3px;background:var(--border);flex-shrink:0;}
+.deck-progress-fill{height:100%;background:var(--accent);transition:width .25s;}
+.deck-body{flex:1;display:flex;align-items:center;justify-content:center;padding:36px 40px;overflow:auto;}
+.slide{max-width:980px;width:100%;animation:fadein .28s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.slide-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.09em;color:var(--accent);text-transform:uppercase;margin-bottom:10px;}
+.slide h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;margin:0 0 8px;}
+.slide h1.center{text-align:center;}
+.slide .sub{color:var(--ink-soft);font-size:15.5px;margin:0 0 26px;max-width:680px;}
+.slide .sub.center{text-align:center;margin-left:auto;margin-right:auto;}
+.deck-bottombar{height:56px;flex-shrink:0;border-top:1px solid var(--border);background:var(--panel);display:flex;align-items:center;justify-content:space-between;padding:0 20px;}
+.deck-nav-btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:8px 16px;font-size:13.5px;font-weight:600;}
+.deck-nav-btn:disabled{opacity:.35;cursor:not-allowed;}
+.deck-dots{display:flex;gap:5px;}
+.deck-dots span{width:5px;height:5px;border-radius:50%;background:var(--border);}
+.deck-dots span.on{background:var(--accent);width:14px;border-radius:3px;}
+
+.flow-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.flow-chip{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:600;}
+.flow-chip.accent{background:var(--accent);color:#fff;border-color:var(--accent);}
+.flow-arrow{color:var(--ink-faint);font-size:16px;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:820px){.two-col{grid-template-columns:1fr;}}
+.col-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;padding:8px 12px;border-radius:8px;}
+.col-title.in{background:var(--success-bg);color:var(--success);}
+.col-title.out{background:#F1F2F4;color:var(--ink-soft);}
+.chip-list{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;}
+
+.ent-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.ent-card .name{font-weight:700;font-size:13.5px;margin-bottom:8px;}
+.ent-card .field{font-size:12px;font-family:var(--mono);color:var(--ink-soft);padding:2px 0;}
+.ent-card .field.pk{color:var(--ink);font-weight:700;}
+.ent-card.identity{border-top:3px solid #8B7EDB;}
+.ent-card.business{border-top:3px solid var(--ink-faint);}
+.ent-card.scheduling{border-top:3px solid #2FA98C;}
+.ent-card.appt{border-top:3px solid var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.ent-card.package{border-top:3px solid var(--warning);}
+.cardinality{font-size:10.5px;font-family:var(--mono);color:var(--ink-faint);text-align:center;padding:2px 0;}
+
+.tab-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.tab-btn{border:1px solid var(--border);background:#fff;border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+.tab-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ============================= GLOBAL APP STATE ============================= */
+const APP = { mode: 'deck' }; // 'deck' | 'walkthrough'
+
+/* ============================= WALKTHROUGH DATA MODEL ============================= */
+const TODAY = '2026-08-28'; // Friday
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function timeToMin(t){ const p=t.split(':').map(Number); return p[0]*60+p[1]; }
+function minToTime(m){ const h=Math.floor(m/60), mm=m%60; return String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
+function addDays(dateStr,n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function dayAbbr(dateStr){ return DOW[new Date(dateStr+'T00:00:00').getDay()]; }
+function fmtDate(dateStr){ const d=new Date(dateStr+'T00:00:00'); return d.toLocaleDateString('en-ZA',{weekday:'short',day:'numeric',month:'short'}); }
+function fmtDateLong(dateStr){ const d=new Date(dateStr+'T00:00:00'); return d.toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}); }
+
+function freshWalkState(){
+  return {
+    role: null,
+    screen: 'entry',
+    demoNow: '2026-08-28T09:15',
+    toast: null,
+    guided: false, guidedIndex: 0,
+    ctx: { businessId:'precision', serviceId:null, providerId:null, date: TODAY, time:null,
+           apptId:null, bookingOutcome:'success', rescheduleConflict:false, blockForm:null, baFilter:'today' },
+    currentCustomer: { id:'jane', name:'Jane Doe' },
+    packages: { Starter:{ max:1 }, Professional:{ max:5 }, Enterprise:{ max:999 } },
+    businesses: [
+      { id:'precision', name:'Precision Barbers', description:'Professional barbering and grooming appointments.', status:'active', package:'Professional', hours:'09:00–17:00' },
+      { id:'greenview', name:'Greenview Medical Practice', description:'General practice consultations and follow-ups. Scheduling only — no medical records.', status:'active', package:'Starter', hours:'08:00–16:00' },
+      { id:'nova', name:'Nova Beauty Studio', description:'Beauty treatments and styling.', status:'active', package:'Professional', hours:'09:00–18:00' },
+      { id:'thabo', name:'Thabo Mobile Massage', description:'Independent massage therapy practitioner.', status:'active', package:'Starter', hours:'08:00–17:00' },
+    ],
+    services: [
+      { id:'haircut', businessId:'precision', name:'Haircut', duration:30, price:150, active:true },
+      { id:'beard', businessId:'precision', name:'Beard Trim', duration:20, price:80, active:true },
+      { id:'hairbeard', businessId:'precision', name:'Hair + Beard', duration:45, price:200, active:true },
+      { id:'gc', businessId:'greenview', name:'General Consultation', duration:20, price:650, active:true },
+      { id:'fu', businessId:'greenview', name:'Follow-up', duration:15, price:450, active:true },
+      { id:'ec', businessId:'greenview', name:'Extended Consultation', duration:40, price:900, active:true },
+      { id:'mani', businessId:'nova', name:'Gel Manicure', duration:60, price:350, active:true },
+      { id:'facial', businessId:'nova', name:'Express Facial', duration:45, price:450, active:true },
+      { id:'brow', businessId:'nova', name:'Brow Shape', duration:20, price:180, active:true },
+      { id:'sports', businessId:'thabo', name:'Sports Massage', duration:60, price:500, active:true },
+      { id:'deep', businessId:'thabo', name:'Deep Tissue Massage', duration:90, price:700, active:true },
+    ],
+    providers: [
+      { id:'sarah', businessId:'precision', name:'Sarah', active:true },
+      { id:'thabop', businessId:'precision', name:'Thabo', active:true },
+      { id:'ndlovu', businessId:'greenview', name:'Dr Ndlovu', active:true },
+      { id:'naidoo', businessId:'greenview', name:'Dr Naidoo', active:true },
+      { id:'lerato', businessId:'nova', name:'Lerato', active:true },
+      { id:'ayesha', businessId:'nova', name:'Ayesha', active:true },
+      { id:'thabom', businessId:'thabo', name:'Thabo', active:true },
+    ],
+    assignments: {
+      sarah:['haircut','beard','hairbeard'], thabop:['haircut','hairbeard'],
+      ndlovu:['gc','fu','ec'], naidoo:['gc','fu','ec'],
+      lerato:['mani','facial','brow'], ayesha:['mani','brow'],
+      thabom:['sports','deep'],
+    },
+    workingHours: {
+      sarah:{ Mon:{start:'09:00',end:'17:00'}, Tue:{start:'09:00',end:'17:00'}, Wed:{start:'09:00',end:'17:00'}, Thu:{start:'09:00',end:'17:00'}, Fri:{start:'09:00',end:'16:00'}, Sat:null, Sun:null },
+      thabop:{ Mon:{start:'09:00',end:'17:00'}, Tue:{start:'09:00',end:'17:00'}, Wed:{start:'09:00',end:'17:00'}, Thu:{start:'09:00',end:'17:00'}, Fri:{start:'09:00',end:'16:00'}, Sat:{start:'09:00',end:'13:00'}, Sun:null },
+      ndlovu:{ Mon:{start:'08:00',end:'16:00'}, Tue:{start:'08:00',end:'16:00'}, Wed:{start:'08:00',end:'16:00'}, Thu:{start:'08:00',end:'16:00'}, Fri:{start:'08:00',end:'14:00'}, Sat:null, Sun:null },
+      naidoo:{ Mon:{start:'08:00',end:'16:00'}, Tue:{start:'08:00',end:'16:00'}, Wed:{start:'08:00',end:'16:00'}, Thu:{start:'08:00',end:'16:00'}, Fri:{start:'08:00',end:'14:00'}, Sat:null, Sun:null },
+      lerato:{ Mon:{start:'09:00',end:'18:00'}, Tue:{start:'09:00',end:'18:00'}, Wed:{start:'09:00',end:'18:00'}, Thu:{start:'09:00',end:'18:00'}, Fri:{start:'09:00',end:'18:00'}, Sat:{start:'09:00',end:'14:00'}, Sun:null },
+      ayesha:{ Mon:{start:'09:00',end:'18:00'}, Tue:null, Wed:{start:'09:00',end:'18:00'}, Thu:{start:'09:00',end:'18:00'}, Fri:{start:'09:00',end:'18:00'}, Sat:{start:'09:00',end:'14:00'}, Sun:null },
+      thabom:{ Mon:{start:'08:00',end:'17:00'}, Tue:{start:'08:00',end:'17:00'}, Wed:{start:'08:00',end:'17:00'}, Thu:{start:'08:00',end:'17:00'}, Fri:{start:'08:00',end:'17:00'}, Sat:{start:'08:00',end:'12:00'}, Sun:null },
+    },
+    unavailability: [],
+    appointments: [
+      { id:'a1', businessId:'precision', serviceId:'haircut', providerId:'sarah', customerId:'alex', customerName:'Alex', date:TODAY, start:'09:00', end:'09:30', status:'CONFIRMED', priceAtBooking:150 },
+      { id:'a2', businessId:'precision', serviceId:'haircut', providerId:'sarah', customerId:'jane', customerName:'Jane Doe', date:TODAY, start:'10:30', end:'11:00', status:'CONFIRMED', priceAtBooking:150 },
+      { id:'a3', businessId:'precision', serviceId:'beard', providerId:'thabop', customerId:'maria', customerName:'Maria', date:TODAY, start:'11:30', end:'11:50', status:'CONFIRMED', priceAtBooking:80 },
+      { id:'a4', businessId:'precision', serviceId:'beard', providerId:'sarah', customerId:'jane', customerName:'Jane Doe', date:'2026-07-12', start:'09:00', end:'09:20', status:'COMPLETED', priceAtBooking:80 },
+      { id:'a5', businessId:'greenview', serviceId:'gc', providerId:'ndlovu', customerId:'jane', customerName:'Jane Doe', date:'2026-07-02', start:'09:00', end:'09:20', status:'CANCELLED', priceAtBooking:650 },
+    ],
+    apptSeq: 6,
+    newProviderSeq: 1,
+  };
+}
+let S = freshWalkState();
+
+/* ============================= HELPERS ============================= */
+function business(id){ return S.businesses.find(b=>b.id===id); }
+function service(id){ return S.services.find(s=>s.id===id); }
+function provider(id){ return S.providers.find(p=>p.id===id); }
+function servicesFor(bizId, activeOnly){ return S.services.filter(s=>s.businessId===bizId && (!activeOnly || s.active)); }
+function providersFor(bizId, activeOnly){ return S.providers.filter(p=>p.businessId===bizId && (!activeOnly || p.active)); }
+function assignedServiceIds(provId){ return S.assignments[provId] || []; }
+function isAssigned(provId, svcId){ return assignedServiceIds(provId).includes(svcId); }
+function eligibleProviders(bizId, svcId){ return providersFor(bizId, true).filter(p => isAssigned(p.id, svcId)); }
+function priceLabel(svc){ return svc.price==null ? '—' : ('R'+svc.price); }
+function badgeClass(status){ return { CONFIRMED:'confirmed', COMPLETED:'completed', CANCELLED:'cancelled', NO_SHOW:'noshow' }[status] || ''; }
+function activeProviderCount(bizId){ return providersFor(bizId, true).length; }
+function packageMax(bizId){ return S.packages[business(bizId).package].max; }
+
+function computeSlots(providerId, serviceId, dateStr, excludeApptId){
+  const svc = service(serviceId);
+  const day = dayAbbr(dateStr);
+  const wh = (S.workingHours[providerId]||{})[day];
+  if(!wh) return [];
+  const dur = svc.duration;
+  const startMin = timeToMin(wh.start), endMin = timeToMin(wh.end);
+  const slots = [];
+  for(let cur=startMin; cur+dur<=endMin; cur+=30){
+    const s=cur, e=cur+dur;
+    let status='available';
+    for(const u of S.unavailability){
+      if(u.providerId===providerId && u.date===dateStr){
+        const us=timeToMin(u.start), ue=timeToMin(u.end);
+        if(s<ue && e>us){ status='blocked'; break; }
+      }
+    }
+    if(status==='available'){
+      for(const a of S.appointments){
+        if(a.id===excludeApptId) continue;
+        if(a.providerId===providerId && a.date===dateStr && a.status==='CONFIRMED'){
+          const as=timeToMin(a.start), ae=timeToMin(a.end);
+          if(s<ae && e>as){ status='booked'; break; }
+        }
+      }
+    }
+    slots.push({ start: minToTime(s), end: minToTime(e), status });
+  }
+  return slots;
+}
+
+function toast(msg, kind){
+  S.toast = { msg, kind: kind||'info' };
+  render();
+  setTimeout(()=>{ if(S.toast && S.toast.msg===msg){ S.toast=null; render(); } }, 3200);
+}
+
+/* ============================= GUIDED WALKTHROUGH ============================= */
+const GUIDED_STEPS = [
+  { role:'business', screen:'ba2', label:'Business creates a service', desc:'Precision Barbers offers Haircut · 30 min · R150.' },
+  { role:'business', screen:'ba4', label:'Business assigns a provider', desc:'Sarah is assigned to Haircut — this is what makes her eligible to be booked.' },
+  { role:'provider', screen:'sp2', label:'Provider sets working hours', desc:'Sarah works Mon–Thu 09:00–17:00 and Fri 09:00–16:00.' },
+  { role:'provider', screen:'sp3', label:'Provider blocks time off', desc:'Sarah blocks out a period — this disappears from customer availability.' },
+  { role:'customer', screen:'c1', label:'Customer selects a service', desc:'Jane opens Precision Barbers and chooses Haircut.' },
+  { role:'customer', screen:'c3', label:'System calculates availability', desc:'The availability engine combines working hours, blocked time and existing bookings into open slots.' },
+  { role:'customer', screen:'c5', label:'Customer books the appointment', desc:'Jane confirms 10:30–11:00 with Sarah. No payment is collected.' },
+  { role:'provider', screen:'sp1', label:'Provider sees the appointment', desc:"The same confirmed appointment now appears on Sarah's schedule." },
+  { role:'business', screen:'ba5', label:'Business sees the appointment', desc:'The Business Admin appointment list reflects the same booking, across every provider.' },
+];
+function startGuided(){ S.guided = true; S.guidedIndex = 0; applyGuidedStep(); }
+function exitGuided(){ S.guided = false; render(); }
+function guidedNext(){ if(S.guidedIndex < GUIDED_STEPS.length-1){ S.guidedIndex++; applyGuidedStep(); } }
+function guidedPrev(){ if(S.guidedIndex>0){ S.guidedIndex--; applyGuidedStep(); } }
+function applyGuidedStep(){
+  const step = GUIDED_STEPS[S.guidedIndex];
+  S.role = step.role; S.screen = step.screen;
+  S.ctx.businessId='precision'; S.ctx.serviceId='haircut'; S.ctx.providerId='sarah';
+  S.ctx.date = TODAY;
+  render();
+}
+
+/* ============================= NAVIGATION ============================= */
+function setRole(role){
+  S.role = role;
+  S.ctx.businessId = S.ctx.businessId || 'precision';
+  if(role==='customer') S.screen = 'c1';
+  if(role==='business') S.screen = 'ba1';
+  if(role==='provider'){ S.ctx.providerId = (S.ctx.providerId && provider(S.ctx.providerId) && provider(S.ctx.providerId).businessId==='precision') ? S.ctx.providerId : 'sarah'; S.screen = 'sp1'; }
+  if(role==='platform') S.screen = 'pa1';
+  render();
+}
+function go(screen, patch){
+  if(patch) Object.assign(S.ctx, patch);
+  S.screen = screen;
+  window.scrollTo(0,0);
+  render();
+}
+function goEntry(){ S.role=null; S.screen='entry'; S.guided=false; render(); }
+function returnToPresentation(){ APP.mode = 'deck'; renderRoot(); }
+function enterWalkthrough(){ APP.mode = 'walkthrough'; S = freshWalkState(); renderRoot(); }
+
+/* ============================= RENDER ROOT ============================= */
+function renderRoot(){
+  if(APP.mode === 'deck'){ renderDeck(); }
+  else { render(); }
+}
+
+/* ============================= WALKTHROUGH RENDER: SHELL ============================= */
+function render(){
+  const app = document.getElementById('app');
+  let html = '';
+  if(S.screen === 'entry'){ html = renderEntry(); }
+  else if(S.screen === 'states'){ html = withTopChrome(renderStatesGallery()); }
+  else { html = withTopChrome(renderScreen()); }
+  app.innerHTML = html;
+  if(S.toast){ renderToast(); }
+}
+
+function renderToast(){
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:'+(S.toast.kind==='error'?'#B3261E':'#111827')+';color:#fff;padding:10px 18px;border-radius:8px;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.18);z-index:999;';
+  el.textContent = S.toast.msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+function withTopChrome(innerHtml){
+  return topNav() + roleBar() + (S.guided ? guidedBar() : '') + innerHtml;
+}
+
+function topNav(){
+  const cust = S.role==='customer';
+  return `
+  <div class="topnav">
+    <div class="brand" onclick="goEntry()"><span class="dot"></span>AppointHub</div>
+    <div class="topnav-links">
+      <a class="${cust && S.screen==='directory' ? 'active':''}" onclick="setRole('customer');go('directory')">Find Services</a>
+      <a class="${cust && S.screen==='c6' ? 'active':''}" onclick="setRole('customer'); go('c6')">My Appointments</a>
+      <a class="${S.role==='business'||S.role==='provider'||S.role==='platform' ? 'active':''}" onclick="setRole('business')">Provider Portal</a>
+    </div>
+    <div class="topnav-right">
+      <button class="btn btn-outline btn-sm" onclick="returnToPresentation()">← Return to Presentation</button>
+      <div class="user-chip">
+        <div class="avatar"></div>
+        <div><div class="name">${S.currentCustomer.name}</div><div class="sub">${business(S.ctx.businessId) ? business(S.ctx.businessId).name : 'AppointHub'}</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function roleBar(){
+  const roles = [['customer','Customer'],['business','Business Admin'],['provider','Service Provider'],['platform','Platform Admin']];
+  return `
+  <div class="role-bar">
+    <span class="label">Viewing as</span>
+    ${roles.map(r=>`<button class="role-btn ${S.role===r[0]?'active':''}" onclick="setRole('${r[0]}')">${r[1]}</button>`).join('')}
+    <span class="spacer"></span>
+    ${!S.guided ? `<button class="ghost-link" onclick="startGuided()">▶ Start Guided Walkthrough</button>` : ''}
+    <button class="ghost-link" onclick="go('states')">Error &amp; Empty States</button>
+    <button class="ghost-link" onclick="goEntry()">Exit to Start</button>
+  </div>`;
+}
+
+function guidedBar(){
+  const step = GUIDED_STEPS[S.guidedIndex];
+  return `
+  <div class="guided-bar">
+    <span class="step-pill">${S.guidedIndex+1} / ${GUIDED_STEPS.length}</span>
+    <span class="desc"><b>${step.label}.</b> ${step.desc}</span>
+    <button onclick="guidedPrev()" ${S.guidedIndex===0?'disabled style="opacity:.5"':''}>← Back</button>
+    ${S.guidedIndex < GUIDED_STEPS.length-1 ? `<button onclick="guidedNext()">Next →</button>` : `<button onclick="exitGuided()">Finish</button>`}
+    <button class="exit" onclick="exitGuided()">Exit guided mode</button>
+  </div>`;
+}
+
+function renderScreen(){
+  if(S.role==='customer') return renderCustomerShell();
+  if(S.role==='business') return renderConsoleShell('business');
+  if(S.role==='provider') return renderConsoleShell('provider');
+  if(S.role==='platform') return renderConsoleShell('platform');
+  return renderCustomerShell();
+}
+
+function renderEntry(){
+  return `
+  <div class="topnav">
+    <div class="brand"><span class="dot"></span>AppointHub</div>
+    <div class="topnav-right"><button class="btn btn-outline btn-sm" onclick="returnToPresentation()">← Return to Presentation</button></div>
+  </div>
+  <div class="hero">
+    <h1>Explore the Appointment Platform</h1>
+    <p>See how one booking moves through the customer, provider, business and platform experiences — all inside a single connected system.</p>
+    <div class="btn-row" style="justify-content:center;margin-bottom:36px;">
+      <button class="btn btn-primary" onclick="startGuided()">▶ Start Guided Walkthrough</button>
+      <button class="btn btn-outline" onclick="setRole('customer')">Explore Freely</button>
+    </div>
+  </div>
+  <div class="role-grid">
+    <div class="role-card" onclick="setRole('customer')"><div class="num">01</div><div class="t">Customer</div><div class="d">Book an appointment with Precision Barbers.</div></div>
+    <div class="role-card" onclick="setRole('business')"><div class="num">02</div><div class="t">Business Admin</div><div class="d">Configure services, providers and eligibility.</div></div>
+    <div class="role-card" onclick="setRole('provider')"><div class="num">03</div><div class="t">Service Provider</div><div class="d">Manage your schedule and availability.</div></div>
+    <div class="role-card" onclick="setRole('platform')"><div class="num">04</div><div class="t">Platform Admin</div><div class="d">Manage business entitlements and packages.</div></div>
+  </div>
+  <div class="footer-note" style="margin-top:44px;"><a onclick="go('states')">View Error &amp; Empty States reference</a></div>
+  `;
+}
+
+/* ============================= CUSTOMER JOURNEY ============================= */
+function renderCustomerShell(){
+  let inner = '';
+  switch(S.screen){
+    case 'directory': inner = screenDirectory(); break;
+    case 'c1': inner = screenC1(); break;
+    case 'c2': inner = screenC2(); break;
+    case 'c3': inner = screenC3(); break;
+    case 'c4': inner = screenC4(); break;
+    case 'c5': inner = screenC5(); break;
+    case 'c6': inner = screenC6(); break;
+    case 'c7': inner = screenC7(); break;
+    case 'access-denied': inner = screenAccessDenied(); break;
+    case 'slot-taken': inner = screenSlotTaken(); break;
+    case 'server-error': inner = screenServerError(); break;
+    default: inner = screenC1();
+  }
+  return `<div class="shell"><div class="center-wrap"><div class="container">${inner}</div></div></div>`;
+}
+
+function screenDirectory(){
+  return `
+  <h1 class="page-title">Find Services</h1>
+  <p class="page-sub">Choose a business to view services and book an appointment.</p>
+  <div class="grid cols-2">
+    ${S.businesses.map(b=>`
+      <div class="select-card" onclick="go('c1',{businessId:'${b.id}'})">
+        <div class="title-row"><span class="name">${b.name}</span><span class="badge ${b.status==='active'?'active':'inactive'}">${b.status==='active'?'Open':'Inactive'}</span></div>
+        <div class="meta">${b.description}</div>
+        <div class="meta" style="margin-top:8px;color:var(--ink-faint)">Hours: ${b.hours}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function screenC1(){
+  const biz = business(S.ctx.businessId);
+  const svcs = servicesFor(biz.id, true);
+  return `
+  <div class="breadcrumb"><a onclick="go('directory')">Find Services</a> &nbsp;/&nbsp; <b>${biz.name}</b></div>
+  <div class="card" style="margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div><h1 class="page-title" style="margin-bottom:6px;">${biz.name}</h1><p class="page-sub" style="margin-bottom:6px;">${biz.description}</p></div>
+      <span class="badge ${biz.status==='active'?'active':'inactive'}">${biz.status==='active' ? 'Open today' : 'Unavailable'}</span>
+    </div>
+    <div style="font-size:13px;color:var(--ink-faint)">Hours: ${biz.hours}</div>
+  </div>
+  ${biz.status!=='active' ? `
+    <div class="banner warn"><span>⚠</span><div><b>Business currently unavailable for new bookings.</b><br>Existing appointments remain valid — new bookings are paused.</div></div>
+  ` : svcs.length===0 ? `
+    <div class="empty-state"><div class="icon">🗓</div><h3>No services available</h3><p>This business hasn't published any bookable services yet. Check back soon.</p></div>
+  ` : `
+    <h2 class="section-title">Select a Service</h2>
+    <div class="grid cols-1" style="gap:10px;">
+      ${svcs.map(s=>`
+        <div class="select-card" onclick="go('c2',{businessId:'${biz.id}',serviceId:'${s.id}',providerId:null})">
+          <div class="title-row"><span class="name">${s.name}</span><span class="price">${priceLabel(s)}</span></div>
+          <div class="meta">${s.duration} mins</div>
+        </div>`).join('')}
+    </div>
+  `}
+  `;
+}
+
+function screenC2(){
+  const biz = business(S.ctx.businessId);
+  const svc = service(S.ctx.serviceId);
+  const elig = eligibleProviders(biz.id, svc.id);
+  return `
+  <div class="breadcrumb"><a onclick="go('c1')">${biz.name}</a> &nbsp;/&nbsp; <b>Choose a Provider</b></div>
+  <h1 class="page-title">Choose a Provider</h1>
+  <div class="card" style="margin-bottom:20px;">
+    <div class="eyebrow-sm">Selected Service</div>
+    <div class="title-row"><span class="name" style="font-weight:700">${svc.name}</span><span class="price">${priceLabel(svc)}</span></div>
+    <div class="meta">${svc.duration} min</div>
+  </div>
+  ${elig.length===0 ? `
+    <div class="empty-state"><div class="icon">🙈</div><h3>No providers are currently available</h3><p>No one is eligible to perform ${svc.name} right now. Please try another service or check back later.</p></div>
+  ` : `
+    <div class="grid cols-2">
+      ${elig.map(p=>{
+        const slots = computeSlots(p.id, svc.id, TODAY);
+        const next = slots.find(s=>s.status==='available');
+        return `
+        <div class="select-card" onclick="go('c3',{providerId:'${p.id}',date:'${TODAY}',time:null})">
+          <div class="name">${p.name}</div>
+          <div class="meta">Available for ${svc.name}</div>
+          <div class="meta" style="margin-top:6px;color:var(--ink-faint)">${next ? 'Next available: '+next.start : 'No availability today'}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `}
+  <div class="btn-row"><button class="btn btn-outline" onclick="go('c1')">← Back</button></div>
+  `;
+}
+
+function screenC3(){
+  const biz = business(S.ctx.businessId);
+  const svc = service(S.ctx.serviceId);
+  const prov = provider(S.ctx.providerId);
+  const date = S.ctx.date || TODAY;
+  const slots = computeSlots(prov.id, svc.id, date);
+  const days = Array.from({length:7},(_,i)=>addDays(TODAY,i));
+  return `
+  <div class="breadcrumb"><a onclick="go('c2',{providerId:null})">${svc.name}</a> &nbsp;/&nbsp; <b>Date &amp; Time</b></div>
+  <h1 class="page-title">Choose a Date &amp; Time</h1>
+  <div class="grid cols-2" style="align-items:start;">
+    <div class="card">
+      <div class="eyebrow-sm">Summary</div>
+      <div class="kv"><span class="k">Service</span><span class="v">${svc.name}</span></div>
+      <div class="kv"><span class="k">Provider</span><span class="v">${prov.name}</span></div>
+      <div class="kv"><span class="k">Duration</span><span class="v">${svc.duration} min</span></div>
+      <div class="kv"><span class="k">Expected Price</span><span class="v">${priceLabel(svc)}</span></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow-sm">Date</div>
+      <div class="day-strip">
+        ${days.map(d=>`<div class="day-btn ${d===date?'selected':''}" onclick="go('c3',{date:'${d}',time:null})"><div class="dow">${fmtDate(d).split(',')[0]}</div><div class="num">${d.slice(-2)}</div></div>`).join('')}
+      </div>
+      <div class="divider"></div>
+      <div class="eyebrow-sm">Available Times — ${fmtDate(date)}</div>
+      ${slots.length===0 ? `
+        <div class="empty-state" style="padding:26px 10px;"><div class="icon">🕑</div><h3>No available times</h3><p>${prov.name} isn't working this day, or every slot is taken. Try another date.</p></div>
+      ` : `
+        <div class="slot-grid">
+          ${slots.map(s=>`
+            <button class="slot-btn ${s.status!=='available'?s.status:(S.ctx.time===s.start?'selected':'')}"
+              ${s.status!=='available' ? 'disabled' : `onclick="go('c3',{time:'${s.start}'})"`}>
+              ${s.start}${s.status!=='available' ? '<br><span style="font-size:10px">'+(s.status==='booked'?'Booked':'Blocked')+'</span>' : ''}
+            </button>`).join('')}
+        </div>
+      `}
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="go('c2')">← Back</button>
+    <button class="btn btn-primary" ${!S.ctx.time?'disabled':''} onclick="go('c4')">Continue</button>
+  </div>
+  `;
+}
+
+function screenC4(){
+  const biz = business(S.ctx.businessId);
+  const svc = service(S.ctx.serviceId);
+  const prov = provider(S.ctx.providerId);
+  const c = S.ctx;
+  const endMin = timeToMin(c.time)+svc.duration;
+  return `
+  <div class="breadcrumb"><b>Booking Review</b></div>
+  <h1 class="page-title">Review &amp; Confirm</h1>
+  <div class="card">
+    <div class="eyebrow-sm">${biz.name}</div>
+    <div class="kv"><span class="k">Service</span><span class="v">${svc.name}</span></div>
+    <div class="kv"><span class="k">Provider</span><span class="v">${prov.name}</span></div>
+    <div class="kv"><span class="k">Date</span><span class="v">${fmtDateLong(c.date)}</span></div>
+    <div class="kv"><span class="k">Time</span><span class="v">${c.time}–${minToTime(endMin)}</span></div>
+    <div class="kv"><span class="k">Expected Price</span><span class="v">${priceLabel(svc)}</span></div>
+    <div class="divider"></div>
+    <div class="kv"><span class="k">Customer</span><span class="v">${S.currentCustomer.name}</span></div>
+  </div>
+  <div class="card" style="background:var(--bg);border-style:dashed;">
+    <div class="eyebrow-sm">Demo control</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;">Simulate what happens at confirmation:</div>
+    <select onchange="S.ctx.bookingOutcome=this.value" style="width:auto;display:inline-block;">
+      <option value="success" ${c.bookingOutcome==='success'?'selected':''}>Normal — confirm successfully</option>
+      <option value="taken" ${c.bookingOutcome==='taken'?'selected':''}>Someone else books this slot first</option>
+      <option value="error" ${c.bookingOutcome==='error'?'selected':''}>Server error</option>
+    </select>
+  </div>
+  <div class="banner info" style="margin-top:14px;"><span>ℹ</span><div>Your appointment will be confirmed after final availability validation. No payment is collected.</div></div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="go('c3')">← Back</button>
+    <button class="btn btn-primary" onclick="confirmBooking()">Confirm Booking</button>
+  </div>
+  `;
+}
+
+function confirmBooking(){
+  const c = S.ctx;
+  const svc = service(c.serviceId);
+  if(c.bookingOutcome==='error'){ go('server-error'); return; }
+  if(c.bookingOutcome==='taken'){
+    S.appointments.push({ id:'ph'+Date.now(), businessId:c.businessId, serviceId:c.serviceId, providerId:c.providerId,
+      customerId:'other', customerName:'Another Customer', date:c.date, start:c.time, end:minToTime(timeToMin(c.time)+svc.duration), status:'CONFIRMED', priceAtBooking:svc.price });
+    go('slot-taken');
+    return;
+  }
+  const id = 'a'+(S.apptSeq++);
+  S.appointments.push({ id, businessId:c.businessId, serviceId:c.serviceId, providerId:c.providerId,
+    customerId:S.currentCustomer.id, customerName:S.currentCustomer.name, date:c.date, start:c.time,
+    end:minToTime(timeToMin(c.time)+svc.duration), status:'CONFIRMED', priceAtBooking:svc.price });
+  S.ctx.apptId = id;
+  go('c5');
+}
+
+function screenSlotTaken(){
+  return `
+  <div class="card" style="text-align:center;padding:44px 24px;">
+    <div style="font-size:28px;margin-bottom:10px;">⏱</div>
+    <h2 class="section-title" style="justify-content:center;">This time was just booked</h2>
+    <p style="color:var(--ink-soft);font-size:14px;">Someone else booked this slot moments before you confirmed. Please choose another time.</p>
+    <div class="btn-row" style="justify-content:center;"><button class="btn btn-primary" onclick="go('c3',{time:null})">Choose Another Time</button></div>
+  </div>`;
+}
+function screenServerError(){
+  return `
+  <div class="card" style="text-align:center;padding:44px 24px;">
+    <div style="font-size:28px;margin-bottom:10px;">⚠</div>
+    <h2 class="section-title" style="justify-content:center;">Something went wrong</h2>
+    <p style="color:var(--ink-soft);font-size:14px;">We couldn't process your booking. Nothing has been charged or reserved.</p>
+    <div class="btn-row" style="justify-content:center;"><button class="btn btn-primary" onclick="go('c4')">Try Again</button></div>
+  </div>`;
+}
+
+function screenC5(){
+  const a = S.appointments.find(x=>x.id===S.ctx.apptId);
+  const svc = service(a.serviceId), prov = provider(a.providerId), biz = business(a.businessId);
+  return `
+  <div class="card" style="text-align:center;padding:38px 24px;">
+    <div style="font-size:30px;margin-bottom:6px;">✅</div>
+    <h1 class="page-title" style="text-align:center;">Appointment Confirmed</h1>
+    <div style="margin:10px 0 18px;"><span class="badge confirmed">CONFIRMED</span></div>
+    <div style="text-align:left;max-width:320px;margin:0 auto;">
+      <div class="kv"><span class="k">Service</span><span class="v">${svc.name}</span></div>
+      <div class="kv"><span class="k">Provider</span><span class="v">${prov.name}</span></div>
+      <div class="kv"><span class="k">Date</span><span class="v">${fmtDateLong(a.date)}</span></div>
+      <div class="kv"><span class="k">Time</span><span class="v">${a.start}–${a.end}</span></div>
+      <div class="kv"><span class="k">Expected Price</span><span class="v">${priceLabel(svc)}</span></div>
+    </div>
+  </div>
+  <div class="btn-row" style="justify-content:center;">
+    <button class="btn btn-primary" onclick="go('c6')">View My Appointments</button>
+    <button class="btn btn-outline" onclick="go('c1',{businessId:'${biz.id}'})">Back to ${biz.name}</button>
+  </div>`;
+}
+
+function screenC6(){
+  const mine = S.appointments.filter(a=>a.customerId===S.currentCustomer.id);
+  const upcoming = mine.filter(a=>a.status==='CONFIRMED' && a.date>=TODAY);
+  const history = mine.filter(a=>a.status!=='CONFIRMED' || a.date<TODAY);
+  return `
+  <h1 class="page-title">My Appointments</h1>
+  <p class="page-sub">Only your own appointments are shown here.</p>
+  <h2 class="section-title">Upcoming</h2>
+  ${upcoming.length===0 ? `<div class="empty-state" style="padding:24px;"><p>No upcoming appointments.</p></div>` : upcoming.map(a=>{
+    const svc=service(a.serviceId), prov=provider(a.providerId), biz=business(a.businessId);
+    return `
+    <div class="card">
+      <div class="title-row">
+        <div><div style="font-weight:700;font-size:15px;">${svc.name}</div><div class="meta">${biz.name} · ${prov.name}</div><div class="meta">${fmtDate(a.date)} · ${a.start}</div></div>
+        <span class="badge ${badgeClass(a.status)}">${a.status}</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" onclick="go('c7',{apptId:'${a.id}'})">Reschedule</button>
+        <button class="btn btn-danger-outline btn-sm" onclick="cancelAppt('${a.id}')">Cancel</button>
+      </div>
+    </div>`;
+  }).join('')}
+  <h2 class="section-title" style="margin-top:22px;">History</h2>
+  ${history.length===0 ? `<div class="empty-state" style="padding:24px;"><p>No past appointments yet.</p></div>` : `
+  <div class="card"><table><tbody>
+    ${history.map(a=>{ const svc=service(a.serviceId); return `<tr><td>${svc.name}<div class="sub">${fmtDate(a.date)}</div></td><td style="text-align:right;"><span class="badge ${badgeClass(a.status)}">${a.status}</span></td></tr>`;}).join('')}
+  </tbody></table></div>`}
+  <div class="footer-note"><a onclick="go('access-denied')">Preview: Access Denied state</a></div>
+  `;
+}
+
+function cancelAppt(id){
+  const a = S.appointments.find(x=>x.id===id);
+  a.status = 'CANCELLED';
+  toast('Appointment cancelled.');
+}
+
+function screenAccessDenied(){
+  return `
+  <div class="card" style="text-align:center;padding:44px 24px;">
+    <div style="font-size:28px;margin-bottom:10px;">🔒</div>
+    <h2 class="section-title" style="justify-content:center;">Access Denied</h2>
+    <p style="color:var(--ink-soft);font-size:14px;">This appointment belongs to another customer and can't be viewed or modified from your account.</p>
+    <div class="btn-row" style="justify-content:center;"><button class="btn btn-primary" onclick="go('c6')">Back to My Appointments</button></div>
+  </div>`;
+}
+
+function screenC7(){
+  const a = S.appointments.find(x=>x.id===S.ctx.apptId);
+  const svc = service(a.serviceId), prov = provider(a.providerId);
+  const date = S.ctx.date || a.date;
+  const slots = computeSlots(prov.id, svc.id, date, a.id);
+  const days = Array.from({length:7},(_,i)=>addDays(TODAY,i));
+  return `
+  <h1 class="page-title">Reschedule Appointment</h1>
+  <div class="card">
+    <div class="eyebrow-sm">Current</div>
+    <div class="kv"><span class="k">${svc.name}</span><span class="v">${prov.name}</span></div>
+    <div class="kv"><span class="k">Time</span><span class="v">${a.start}–${a.end} · ${fmtDate(a.date)}</span></div>
+  </div>
+  <div class="card">
+    <div class="eyebrow-sm">Select New Date</div>
+    <div class="day-strip">${days.map(d=>`<div class="day-btn ${d===date?'selected':''}" onclick="go('c7',{date:'${d}'})"><div class="dow">${fmtDate(d).split(',')[0]}</div><div class="num">${d.slice(-2)}</div></div>`).join('')}</div>
+    <div class="divider"></div>
+    <div class="eyebrow-sm">Select New Time</div>
+    ${slots.length===0 ? `<p style="font-size:13px;color:var(--ink-soft);">No available times this day.</p>` : `
+    <div class="slot-grid">${slots.map(s=>`<button class="slot-btn ${s.status!=='available'?s.status:(S.ctx.time===s.start?'selected':'')}" ${s.status!=='available'?'disabled':`onclick="go('c7',{time:'${s.start}'})"`}>${s.start}</button>`).join('')}</div>`}
+    <div class="checkbox-row" style="margin-top:14px;">
+      <input type="checkbox" id="rc" ${S.ctx.rescheduleConflict?'checked':''} onchange="S.ctx.rescheduleConflict=this.checked">
+      <label for="rc">Demo: simulate this slot being taken right before I confirm</label>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="go('c6')">Cancel</button>
+    <button class="btn btn-primary" ${!S.ctx.time?'disabled':''} onclick="confirmReschedule()">Confirm New Time</button>
+  </div>
+  `;
+}
+
+function confirmReschedule(){
+  const a = S.appointments.find(x=>x.id===S.ctx.apptId);
+  const svc = service(a.serviceId);
+  if(S.ctx.rescheduleConflict){
+    toast('This time is no longer available. Your original appointment remains unchanged.', 'error');
+    return;
+  }
+  a.date = S.ctx.date; a.start = S.ctx.time; a.end = minToTime(timeToMin(S.ctx.time)+svc.duration);
+  toast('Appointment rescheduled.');
+  go('c6');
+}
+
+/* ============================= CONSOLE SHELL (Business/Provider/Platform) ============================= */
+function renderConsoleShell(kind){
+  const items = kind==='business'
+    ? [['ba1','Dashboard'],['ba2','Services'],['ba3','Providers'],['ba4','Assignments'],['ba5','Appointments']]
+    : kind==='provider'
+    ? [['sp1','My Schedule'],['sp2','Working Hours'],['sp3','Block Time'],['sp4','Appointment Detail']]
+    : [['pa1','Businesses'],['pa2','Package Assignment']];
+  const eyebrow = kind==='business' ? 'Business Console' : kind==='provider' ? 'Provider Hub' : 'Platform Console';
+  if(!items.find(i=>i[0]===S.screen)) S.screen = items[0][0];
+  let inner = '';
+  if(kind==='business'){
+    if(S.screen==='ba1') inner = screenBA1();
+    if(S.screen==='ba2') inner = screenBA2();
+    if(S.screen==='ba3') inner = screenBA3();
+    if(S.screen==='ba4') inner = screenBA4();
+    if(S.screen==='ba5') inner = screenBA5();
+  } else if(kind==='provider'){
+    if(S.screen==='sp1') inner = screenSP1();
+    if(S.screen==='sp2') inner = screenSP2();
+    if(S.screen==='sp3') inner = screenSP3();
+    if(S.screen==='sp4') inner = screenSP4();
+  } else {
+    if(S.screen==='pa1') inner = screenPA1();
+    if(S.screen==='pa2') inner = screenPA2();
+  }
+  return `
+  <div class="sidebar-shell">
+    <div class="sidebar">
+      <div class="eyebrow">${eyebrow}</div>
+      ${items.map(i=>`<a class="item ${S.screen===i[0]?'active':''}" onclick="go('${i[0]}')">${i[1]}</a>`).join('')}
+    </div>
+    <div class="content-area"><div class="container wide">${inner}</div></div>
+  </div>`;
+}
+
+/* ---------------- BUSINESS ADMIN ---------------- */
+function screenBA1(){
+  const biz = business(S.ctx.businessId);
+  const todays = S.appointments.filter(a=>a.businessId===biz.id && a.date===TODAY && a.status==='CONFIRMED');
+  const activeProv = activeProviderCount(biz.id);
+  const activeSvc = servicesFor(biz.id, true).length;
+  return `
+  <h1 class="page-title">Dashboard</h1>
+  <p class="page-sub">${biz.name}</p>
+  <div class="grid cols-4">
+    <div class="metric-card"><div class="val">${todays.length}</div><div class="lbl">Today's Appointments</div></div>
+    <div class="metric-card"><div class="val">${activeProv} / ${packageMax(biz.id)}</div><div class="lbl">Active Providers</div></div>
+    <div class="metric-card"><div class="val">${activeSvc}</div><div class="lbl">Active Services</div></div>
+    <div class="metric-card"><div class="val">${biz.package}</div><div class="lbl">Current Package</div></div>
+  </div>
+  <div class="card" style="margin-top:20px;">
+    <h2 class="section-title">Quick Actions</h2>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-outline btn-sm" onclick="go('ba5')">Appointments</button>
+      <button class="btn btn-outline btn-sm" onclick="go('ba2')">Services</button>
+      <button class="btn btn-outline btn-sm" onclick="go('ba3')">Providers</button>
+      <button class="btn btn-outline btn-sm" onclick="go('ba4')">Provider Assignments</button>
+    </div>
+  </div>`;
+}
+
+function screenBA2(){
+  const biz = business(S.ctx.businessId);
+  const svcs = servicesFor(biz.id, false);
+  return `
+  <h1 class="page-title">Services</h1>
+  <p class="page-sub">${biz.name}</p>
+  <div class="card">
+    <table>
+      <thead><tr><th>Service</th><th>Duration</th><th>Price</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${svcs.map(s=>`
+        <tr>
+          <td>${s.name}</td><td>${s.duration} min</td><td>${priceLabel(s)}</td>
+          <td><span class="badge ${s.active?'active':'inactive'}">${s.active?'Active':'Inactive'}</span></td>
+          <td style="text-align:right;">
+            ${s.price!=null ? `<button class="btn btn-outline btn-sm" onclick="bumpPrice('${s.id}')">+R20 price</button>` : ''}
+            <button class="btn btn-outline btn-sm" onclick="toggleServiceActive('${s.id}')">${s.active?'Deactivate':'Activate'}</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="banner info" style="margin-top:14px;"><span>ℹ</span><div>Changing a price only affects <b>future</b> bookings. Historical appointments keep the price captured when booked.</div></div>
+  <div class="btn-row"><button class="btn btn-primary" disabled title="Not part of MVP demo">+ Add Service</button></div>
+  `;
+}
+function bumpPrice(id){ const s = service(id); s.price += 20; toast(s.name+' price updated to R'+s.price+'. Historical bookings are unaffected.'); }
+function toggleServiceActive(id){ const s = service(id); s.active = !s.active; toast(s.name+' is now '+(s.active?'active':'inactive')+'.'); }
+
+function screenBA3(){
+  const biz = business(S.ctx.businessId);
+  const provs = providersFor(biz.id, false);
+  const max = packageMax(biz.id);
+  const activeCount = activeProviderCount(biz.id);
+  const atLimit = activeCount >= max;
+  return `
+  <h1 class="page-title">Providers</h1>
+  <p class="page-sub">${biz.package} Package · Active Providers: ${activeCount} / ${max}</p>
+  <div class="grid cols-2">
+    ${provs.map(p=>`
+      <div class="card">
+        <div class="title-row"><span class="name" style="font-weight:700">${p.name}</span><span class="badge ${p.active?'active':'inactive'}">${p.active?'Active':'Inactive'}</span></div>
+        <div class="meta" style="margin-top:6px;">Assigned: ${assignedServiceIds(p.id).map(id=>service(id)?service(id).name:'').join(', ') || '—'}</div>
+        <div class="btn-row">
+          <button class="btn btn-outline btn-sm" onclick="toggleProviderActive('${p.id}')">${p.active?'Deactivate':'Activate'}</button>
+          <button class="btn btn-outline btn-sm" onclick="go('ba4')">Manage Services</button>
+          <button class="btn btn-outline btn-sm" onclick="setRole('provider'); go('sp2',{providerId:'${p.id}'})">Manage Availability</button>
+        </div>
+      </div>`).join('')}
+  </div>
+  ${atLimit ? `
+    <div class="banner warn" style="margin-top:16px;"><span>⚠</span><div><b>Provider limit reached for current package.</b><br>Contact your platform admin, or view package options below.</div></div>
+    <div class="btn-row"><button class="btn btn-primary" disabled>+ Add Provider</button><button class="btn btn-outline" onclick="setRole('platform'); go('pa2',{businessId:'${biz.id}'})">View Package</button></div>
+  ` : `
+    <div class="btn-row"><button class="btn btn-primary" onclick="addProvider('${biz.id}')">+ Add Provider</button></div>
+  `}
+  `;
+}
+function toggleProviderActive(id){ const p = provider(id); p.active = !p.active; toast(p.name+' is now '+(p.active?'active':'inactive')+'.'); }
+function addProvider(bizId){
+  const max = packageMax(bizId);
+  if(activeProviderCount(bizId) >= max){ toast('Provider limit reached for current package.', 'error'); return; }
+  const n = S.newProviderSeq++;
+  const id = 'newp'+n;
+  S.providers.push({ id, businessId:bizId, name:'New Provider '+n, active:true });
+  S.assignments[id] = [];
+  S.workingHours[id] = { Mon:{start:'09:00',end:'17:00'}, Tue:{start:'09:00',end:'17:00'}, Wed:{start:'09:00',end:'17:00'}, Thu:{start:'09:00',end:'17:00'}, Fri:{start:'09:00',end:'16:00'}, Sat:null, Sun:null };
+  toast('New Provider '+n+' added.');
+}
+
+function screenBA4(){
+  const biz = business(S.ctx.businessId);
+  const svcs = servicesFor(biz.id, true);
+  const provs = providersFor(biz.id, true);
+  return `
+  <h1 class="page-title">Provider · Service Assignments</h1>
+  <p class="page-sub">Only assigned, active providers become eligible for a service on the customer booking screen.</p>
+  ${provs.map(p=>`
+    <div class="card">
+      <div class="section-title"><span>${p.name}</span></div>
+      ${svcs.map(s=>`
+        <label class="checkbox-row">
+          <input type="checkbox" ${isAssigned(p.id,s.id)?'checked':''} onchange="toggleAssignment('${p.id}','${s.id}')">
+          ${s.name}
+        </label>`).join('')}
+    </div>`).join('')}
+  <div class="footer-note"><a onclick="setRole('customer'); go('c2',{serviceId:'haircut',providerId:null})">Preview customer view for Haircut →</a></div>
+  `;
+}
+function toggleAssignment(provId, svcId){
+  const list = S.assignments[provId] || (S.assignments[provId]=[]);
+  const i = list.indexOf(svcId);
+  if(i>=0){ list.splice(i,1); } else { list.push(svcId); }
+  toast('Assignments updated for '+provider(provId).name+'.');
+}
+
+function screenBA5(){
+  const biz = business(S.ctx.businessId);
+  const all = S.appointments.filter(a=>a.businessId===biz.id);
+  const filter = S.ctx.baFilter || 'today';
+  let list = all;
+  if(filter==='today') list = all.filter(a=>a.date===TODAY);
+  if(filter==='upcoming') list = all.filter(a=>a.date>=TODAY && a.status==='CONFIRMED');
+  if(filter==='history') list = all.filter(a=>a.status!=='CONFIRMED' || a.date<TODAY);
+  list = [...list].sort((x,y)=> (x.date+x.start).localeCompare(y.date+y.start));
+  return `
+  <h1 class="page-title">Appointments</h1>
+  <p class="page-sub">${biz.name} — all providers</p>
+  <div class="btn-row" style="margin-top:0;margin-bottom:14px;">
+    ${['today','upcoming','history'].map(f=>`<button class="btn btn-sm ${filter===f?'btn-primary':'btn-outline'}" onclick="S.ctx.baFilter='${f}';render()">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}
+  </div>
+  <div class="card">
+    ${list.length===0 ? `<div class="empty-state"><p>No appointments in this view.</p></div>` : `
+    <table>
+      <thead><tr><th>Time</th><th>Service</th><th>Provider</th><th>Customer</th><th>Status</th></tr></thead>
+      <tbody>
+        ${list.map(a=>{ const svc=service(a.serviceId), prov=provider(a.providerId); return `<tr><td>${a.start}<div class="sub">${fmtDate(a.date)}</div></td><td>${svc.name}</td><td>${prov.name}</td><td>${a.customerName}</td><td><span class="badge ${badgeClass(a.status)}">${a.status}</span></td></tr>`;}).join('')}
+      </tbody>
+    </table>`}
+  </div>`;
+}
+
+/* ---------------- SERVICE PROVIDER ---------------- */
+function currentProviderId(){
+  return S.ctx.providerId && provider(S.ctx.providerId) && provider(S.ctx.providerId).businessId==='precision' ? S.ctx.providerId : 'sarah';
+}
+function screenSP1(){
+  const prov = provider(currentProviderId());
+  const biz = business(prov.businessId);
+  const todays = S.appointments.filter(a=>a.providerId===prov.id && a.date===TODAY).sort((x,y)=>x.start.localeCompare(y.start));
+  return `
+  <h1 class="page-title">${prov.name}</h1>
+  <p class="page-sub">${biz.name} · My Schedule</p>
+  <div class="card">
+    <div class="eyebrow-sm">Today — ${fmtDate(TODAY)}</div>
+    ${todays.length===0 ? `<div class="empty-state" style="padding:20px;"><p>No appointments today.</p></div>` : `
+    <table>
+      <thead><tr><th>Time</th><th>Service</th><th>Customer</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${todays.map(a=>{ const svc=service(a.serviceId); return `<tr><td>${a.start}–${a.end}</td><td>${svc.name}</td><td>${a.customerName}</td><td><span class="badge ${badgeClass(a.status)}">${a.status}</span></td><td style="text-align:right;"><button class="btn btn-outline btn-sm" onclick="go('sp4',{apptId:'${a.id}'})">View</button></td></tr>`;}).join('')}
+      </tbody>
+    </table>`}
+  </div>
+  <div class="btn-row"><button class="btn btn-outline btn-sm" onclick="go('sp2')">Working Hours</button><button class="btn btn-outline btn-sm" onclick="go('sp3')">Block Time Off</button></div>
+  `;
+}
+
+function screenSP2(){
+  const prov = provider(currentProviderId());
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const wh = S.workingHours[prov.id];
+  return `
+  <h1 class="page-title">Working Hours</h1>
+  <p class="page-sub">${prov.name} — recurring weekly schedule. Working hours define possible availability; they do not create permanent appointment slots.</p>
+  <div class="card">
+    ${days.map(d=>{
+      const w = wh[d];
+      return `
+      <div style="display:flex;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);">
+        <div style="width:44px;font-weight:600;font-size:13.5px;">${d}</div>
+        <label class="checkbox-row" style="padding:0;"><input type="checkbox" ${w?'checked':''} onchange="toggleWorkingDay('${prov.id}','${d}',this.checked)"> Working</label>
+        ${w ? `<input type="time" value="${w.start}" style="width:110px;" onchange="setWorkingTime('${prov.id}','${d}','start',this.value)"><span style="color:var(--ink-faint)">to</span><input type="time" value="${w.end}" style="width:110px;" onchange="setWorkingTime('${prov.id}','${d}','end',this.value)">` : `<span style="color:var(--ink-faint);font-size:13px;">Not Working</span>`}
+      </div>`;
+    }).join('')}
+  </div>
+  `;
+}
+function toggleWorkingDay(provId, day, checked){ S.workingHours[provId][day] = checked ? { start:'09:00', end:'17:00' } : null; toast(day+' updated for '+provider(provId).name+'.'); }
+function setWorkingTime(provId, day, field, val){ S.workingHours[provId][day][field] = val; render(); }
+
+function screenSP3(){
+  const prov = provider(currentProviderId());
+  const c = S.ctx;
+  const form = c.blockForm || (c.blockForm = { date: TODAY, start:'09:30', end:'10:00', reason:'Unavailable' });
+  const mine = S.unavailability.filter(u=>u.providerId===prov.id);
+  return `
+  <h1 class="page-title">Block Time</h1>
+  <p class="page-sub">${prov.name} — mark a period as unavailable. This removes matching slots from customer availability.</p>
+  <div class="card">
+    <div class="eyebrow-sm">New Unavailable Period</div>
+    <div class="grid cols-3">
+      <div class="field"><label class="field-label">Date</label><input type="date" value="${form.date}" onchange="S.ctx.blockForm.date=this.value"></div>
+      <div class="field"><label class="field-label">Start</label><input type="time" value="${form.start}" onchange="S.ctx.blockForm.start=this.value"></div>
+      <div class="field"><label class="field-label">End</label><input type="time" value="${form.end}" onchange="S.ctx.blockForm.end=this.value"></div>
+    </div>
+    <div class="field"><label class="field-label">Reason</label><input type="text" value="${form.reason}" onchange="S.ctx.blockForm.reason=this.value"></div>
+    <button class="btn btn-primary" onclick="blockTime('${prov.id}')">Block Time</button>
+  </div>
+  <div class="card">
+    <div class="eyebrow-sm">Blocked Periods</div>
+    ${mine.length===0 ? `<p style="font-size:13px;color:var(--ink-soft);">No blocked periods yet.</p>` : mine.map(u=>`<div class="kv"><span class="k">${fmtDate(u.date)} · ${u.start}–${u.end}</span><span class="v" style="font-weight:400;color:var(--ink-faint);">${u.reason}</span></div>`).join('')}
+  </div>
+  <div class="footer-note"><a onclick="setRole('customer'); go('c3',{businessId:'precision',serviceId:'haircut',providerId:'${prov.id}',date:'${form.date}',time:null})">See the effect on customer booking →</a></div>
+  `;
+}
+function blockTime(provId){
+  const f = S.ctx.blockForm;
+  S.unavailability.push({ providerId:provId, date:f.date, start:f.start, end:f.end, reason:f.reason });
+  toast('Time blocked for '+provider(provId).name+'.');
+  render();
+}
+
+function screenSP4(){
+  const a = S.appointments.find(x=>x.id===S.ctx.apptId) || S.appointments.find(x=>x.id==='a2');
+  const svc = service(a.serviceId), prov = provider(a.providerId);
+  const now = new Date(S.demoNow);
+  const apptStart = new Date(a.date+'T'+a.start);
+  const canNoShow = now >= apptStart;
+  const terminal = a.status==='COMPLETED' || a.status==='NO_SHOW' || a.status==='CANCELLED';
+  return `
+  <h1 class="page-title">Appointment Detail</h1>
+  <div class="card">
+    <div class="title-row"><span class="name" style="font-weight:700;font-size:16px;">${svc.name}</span><span class="badge ${badgeClass(a.status)}">${a.status}</span></div>
+    <div class="kv"><span class="k">Customer</span><span class="v">${a.customerName}</span></div>
+    <div class="kv"><span class="k">Provider</span><span class="v">${prov.name}</span></div>
+    <div class="kv"><span class="k">Date</span><span class="v">${fmtDateLong(a.date)}</span></div>
+    <div class="kv"><span class="k">Time</span><span class="v">${a.start}–${a.end}</span></div>
+  </div>
+  ${terminal ? `<div class="banner info"><span>ℹ</span><div>This appointment has reached a terminal state and can no longer be changed.</div></div>` : `
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="markAppt('${a.id}','COMPLETED')">Mark Completed</button>
+    <button class="btn btn-danger-outline" ${!canNoShow?'disabled title="No-show can only be recorded after the appointment time."':''} onclick="markAppt('${a.id}','NO_SHOW')">Mark No-show</button>
+  </div>
+  ${!canNoShow ? `<div class="banner warn" style="margin-top:12px;"><span>⏳</span><div>No-show can only be recorded after the appointment time. <a onclick="advanceDemoClock()" style="text-decoration:underline;">Advance demo clock past ${a.end}</a></div></div>` : ''}
+  `}
+  <div class="footer-note">Demo clock: ${S.demoNow.replace('T',' ')}</div>
+  `;
+}
+function markAppt(id, status){ const a = S.appointments.find(x=>x.id===id); a.status = status; toast('Appointment marked '+status.replace('_',' ')+'.'); }
+function advanceDemoClock(){ const a = S.appointments.find(x=>x.id===(S.ctx.apptId||'a2')); S.demoNow = a.date + 'T12:00'; render(); }
+
+/* ---------------- PLATFORM ADMIN ---------------- */
+function screenPA1(){
+  return `
+  <h1 class="page-title">Businesses</h1>
+  <p class="page-sub">Platform-wide entitlements. Kept intentionally narrow — industry and category are descriptive only.</p>
+  <div class="card">
+    <table>
+      <thead><tr><th>Business</th><th>Status</th><th>Package</th><th>Active Providers</th><th></th></tr></thead>
+      <tbody>
+        ${S.businesses.map(b=>`
+        <tr>
+          <td>${b.name}</td>
+          <td><span class="badge ${b.status==='active'?'active':'inactive'}">${b.status==='active'?'Active':'Inactive'}</span></td>
+          <td>${b.package}</td>
+          <td>${activeProviderCount(b.id)} / ${packageMax(b.id)}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-outline btn-sm" onclick="go('pa2',{businessId:'${b.id}'})">Change Package</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleBusinessActive('${b.id}')">${b.status==='active'?'Deactivate':'Activate'}</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="footer-note"><a onclick="setRole('customer'); go('directory')">See the effect on the customer directory →</a></div>
+  `;
+}
+function toggleBusinessActive(id){ const b = business(id); b.status = b.status==='active' ? 'inactive' : 'active'; toast(b.name+' is now '+b.status+'.'); }
+
+function screenPA2(){
+  const biz = business(S.ctx.businessId || 'precision');
+  const activeCount = activeProviderCount(biz.id);
+  const packs = [['Starter','1 provider'],['Professional','5 providers'],['Enterprise','Configurable']];
+  return `
+  <h1 class="page-title">Package Assignment</h1>
+  <p class="page-sub">${biz.name}</p>
+  <div class="card">
+    <div class="kv"><span class="k">Current Package</span><span class="v">${biz.package}</span></div>
+    <div class="kv"><span class="k">Active Providers</span><span class="v">${activeCount}</span></div>
+    <div class="kv"><span class="k">Provider Limit</span><span class="v">${packageMax(biz.id)}</span></div>
+  </div>
+  <h2 class="section-title" style="margin-top:18px;">Available Packages</h2>
+  <div class="grid cols-3">
+    ${packs.map(p=>`<div class="select-card ${biz.package===p[0]?'selected':''}" onclick="setPackage('${biz.id}','${p[0]}')"><div class="name">${p[0]}</div><div class="meta">${p[1]}</div></div>`).join('')}
+  </div>
+  <div class="banner info" style="margin-top:14px;"><span>ℹ</span><div>Package assignment is an administrative entitlement action. No checkout, billing, or payment method is involved.</div></div>
+  `;
+}
+function setPackage(bizId, pack){
+  const biz = business(bizId);
+  const newMax = S.packages[pack].max;
+  if(activeProviderCount(bizId) > newMax){ toast('Cannot downgrade — reduce active providers to '+newMax+' or fewer first.', 'error'); return; }
+  biz.package = pack;
+  toast(biz.name+' package set to '+pack+'.');
+}
+
+/* ============================= ERROR & EMPTY STATES GALLERY ============================= */
+function renderStatesGallery(){
+  const items = [
+    ['No Services','Business has no active bookable services.'],
+    ['No Eligible Providers','No active provider is assigned to this service.'],
+    ['No Availability','Working hours, blocks or bookings leave no open slots.'],
+    ['Slot Just Booked','Another customer confirmed the slot first.'],
+    ['Package Limit Reached','Business is at its provider limit for the current package.'],
+    ["Access Denied","A customer tried to view another customer's appointment."],
+    ['Business Inactive','Platform Admin paused new bookings for a business.'],
+    ['Service Inactive','Business Admin deactivated a service.'],
+    ['Provider Inactive','Business Admin deactivated a provider.'],
+    ['Failed Reschedule','A reschedule conflict left the original appointment untouched.'],
+    ['Future No-show','No-show can only be recorded once the appointment time has passed.'],
+    ['Server Error','The system could not process an action.'],
+  ];
+  return `
+  <div class="shell"><div class="center-wrap"><div class="container wide">
+  <h1 class="page-title">Error &amp; Empty States Reference</h1>
+  <p class="page-sub">These states share the same card language as the rest of the product. Most are also reachable live in the walkthrough by editing data (deactivating a service, reaching a package limit, and so on).</p>
+  <div class="grid cols-3">
+    ${items.map(i=>`<div class="card"><div style="font-weight:700;font-size:13.5px;margin-bottom:6px;">${i[0]}</div><div style="font-size:12.5px;color:var(--ink-soft);">${i[1]}</div></div>`).join('')}
+  </div>
+  <div class="btn-row"><button class="btn btn-outline" onclick="goEntry()">← Back to Start</button></div>
+  </div></div></div>`;
+}
+
+/* ============================= PRESENTATION DECK ============================= */
+const DECK = { index: 0 };
+
+const EXC_SCENARIOS = [
+  { name:'Slot Just Booked', validation:'Backend revalidates the slot at confirmation time.', decision:'Another customer already holds a CONFIRMED appointment for that time.', feedback:'"This time was just booked. Please choose another."', final:'Booking rejected. Only one CONFIRMED appointment exists.', tone:'error' },
+  { name:'No Availability', validation:'Availability engine finds zero bookable slots for the selected day.', decision:'Working hours, blocked time and existing bookings leave nothing open.', feedback:'"No available times. Try another date."', final:'Customer is prompted to pick a different day or provider.', tone:'warn' },
+  { name:'Failed Reschedule', validation:'New slot is validated before the original is touched.', decision:'The requested new slot is no longer available.', feedback:'"This time is no longer available. Your original appointment remains unchanged."', final:'Original appointment is untouched.', tone:'error' },
+  { name:'Provider Limit Reached', validation:'Business tries to activate an additional provider.', decision:'Active provider count already equals the package limit.', feedback:'"Provider limit reached for current package."', final:'Provider not activated until package is upgraded or a provider is deactivated.', tone:'warn' },
+  { name:'Access Denied', validation:'Customer requests an appointment record.', decision:'The appointment does not belong to the requesting customer.', feedback:'"This appointment belongs to another customer."', final:'Record is not returned. No details are leaked.', tone:'error' },
+  { name:'Inactive Business', validation:'Customer opens a business booking page.', decision:'Platform Admin or Business Admin has paused the business.', feedback:'"Business currently unavailable for new bookings."', final:'Existing appointments remain valid; new bookings are blocked.', tone:'warn' },
+  { name:'Future No-show', validation:'Provider attempts to mark an appointment No-show.', decision:'The appointment start time has not yet passed.', feedback:'"No-show can only be recorded after the appointment time."', final:'Action blocked until the scheduled time passes.', tone:'warn' },
+  { name:'Server Failure', validation:'Booking confirmation request fails unexpectedly.', decision:'No appointment record is created or partially created.', feedback:"\"We couldn't process your booking. Nothing has been charged or reserved.\"", final:'Customer can safely retry.', tone:'error' },
+];
+let excSelected = 0;
+
+const DEMO_BIZ = [
+  { name:'Precision Barbers', service:'Haircut', duration:'30 min', price:'R150', provider:'Sarah' },
+  { name:'Greenview Medical', service:'General Consultation', duration:'20 min', price:'R650', provider:'Dr Ndlovu' },
+  { name:'Nova Beauty Studio', service:'Gel Manicure', duration:'60 min', price:'R350', provider:'Lerato' },
+  { name:'Thabo Mobile Massage', service:'Sports Massage', duration:'60 min', price:'R500', provider:'Thabo' },
+];
+let bizTabSelected = 0;
+
+let availDuration = 30, availInterval = 30, availBlocked = true, availBooked = true;
+function computeDemoSlots(){
+  const startMin = 540, endMin = 960; // 09:00-16:00
+  const slots = [];
+  for(let cur=startMin; cur+availDuration<=endMin; cur+=availInterval){
+    let status='available';
+    if(availBlocked && cur < 780 && cur+availDuration > 720) status='blocked'; // 12:00-13:00 block
+    if(status==='available' && availBooked && cur < 660 && cur+availDuration > 630) status='booked'; // 10:30-11:00 booked
+    slots.push({ t: minToTime(cur), status });
+  }
+  return slots;
+}
+
+function screenLabel(n){ return String(n).padStart(2,'0'); }
+
+const SLIDES = [
+{ section:'Title', render: ()=>`
+  <div class="slide-eyebrow" style="text-align:center;">${screenLabel(1)} · Title</div>
+  <h1 class="center" style="margin-top:40px;">Appointment Booking Platform</h1>
+  <p class="sub center" style="font-size:18px;">System Design &amp; Interactive Platform Walkthrough</p>
+  <p style="text-align:center;color:var(--ink-faint);font-size:14px;">A multi-tenant scheduling platform for service-based businesses.</p>
+`},
+{ section:'The Problem', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(2)} · The Problem</div>
+  <h1>Appointments today are managed by hand</h1>
+  <p class="sub">Calls, messages, manual calendars and spreadsheets — spread across every provider.</p>
+  <div class="flow-row" style="margin-bottom:22px;">
+    <span class="flow-chip">Calls</span><span class="flow-arrow">+</span>
+    <span class="flow-chip">Messages</span><span class="flow-arrow">+</span>
+    <span class="flow-chip">Manual Calendars</span><span class="flow-arrow">→</span>
+    <span class="flow-chip accent">Fragmented Appointment Management</span>
+  </div>
+  <div class="grid cols-2">
+    <div class="card"><div class="eyebrow-sm">Customer needs</div><div style="font-size:15px;font-weight:600;">"Show me when I can actually book."</div></div>
+    <div class="card"><div class="eyebrow-sm">Business needs</div><div style="font-size:15px;font-weight:600;">"Keep my schedule accurate without constant manual coordination."</div></div>
+  </div>
+  <div class="chip-list" style="margin-top:16px;">
+    <span class="chip">Unclear availability</span><span class="chip">Repeated communication</span><span class="chip">Double-booking risk</span><span class="chip">Fragmented records</span><span class="chip">Growing admin workload</span>
+  </div>
+`},
+{ section:'The Product', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(3)} · The Product</div>
+  <h1>One engine. Many businesses.</h1>
+  <p class="sub">Each business is a tenant with its own services, providers and public booking page.</p>
+  <div class="card" style="text-align:center;padding:24px;">
+    <div class="flow-chip accent" style="display:inline-flex;margin-bottom:16px;">Appointment Platform</div>
+    <div class="grid cols-4" style="margin-bottom:16px;">
+      ${DEMO_BIZ.map(b=>`<div class="chip" style="text-align:center;">${b.name}</div>`).join('')}
+    </div>
+    <div style="color:var(--ink-faint);font-size:12px;">↓ each connects to its own</div>
+    <div class="flow-chip" style="display:inline-flex;margin:10px 0;">Public Booking Page</div>
+    <div class="chip-list" style="justify-content:center;display:flex;">
+      <span class="chip">Services</span><span class="chip">Providers</span><span class="chip">Availability</span><span class="chip">Appointments</span><span class="chip">Packages</span>
+    </div>
+  </div>
+  <p style="text-align:center;font-weight:600;margin-top:16px;">Business = tenant boundary.</p>
+`},
+{ section:'MVP Scope', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(4)} · MVP Scope</div>
+  <h1>What's in, what's not</h1>
+  <div class="two-col">
+    <div>
+      <div class="col-title in">In MVP</div>
+      <div class="chip-list">${['Multi-business tenancy','Public booking pages','Services &amp; prices','Provider eligibility','Working hours','Unavailability','Dynamic slots','Booking / cancel / reschedule','Completion / No-show','Role access','Package provider limits'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+    </div>
+    <div>
+      <div class="col-title out">Not MVP</div>
+      <div class="chip-list">${['Service payments','Refunds / commissions','Recurring billing','Ratings / reviews','Marketplace ranking','SMS / WhatsApp','Advanced analytics','Multi-location','AI assistant'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+    </div>
+  </div>
+`},
+{ section:'Users & Authorization', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(5)} · Users &amp; Authorization</div>
+  <h1>Four roles, one permission model</h1>
+  <div class="grid cols-4">
+    <div class="card"><div class="name" style="font-weight:700;">Customer</div><div class="meta" style="color:var(--ink-soft);font-size:13px;margin-top:4px;">Books and manages their own appointments.</div></div>
+    <div class="card"><div class="name" style="font-weight:700;">Service Provider</div><div class="meta" style="color:var(--ink-soft);font-size:13px;margin-top:4px;">Manages their schedule and appointments.</div></div>
+    <div class="card"><div class="name" style="font-weight:700;">Business Admin</div><div class="meta" style="color:var(--ink-soft);font-size:13px;margin-top:4px;">Configures services, providers and eligibility.</div></div>
+    <div class="card"><div class="name" style="font-weight:700;">Platform Admin</div><div class="meta" style="color:var(--ink-soft);font-size:13px;margin-top:4px;">Manages business entitlement and packages.</div></div>
+  </div>
+  <div class="flow-row" style="margin-top:24px;justify-content:center;">
+    <span class="flow-chip">Authenticate</span><span class="flow-arrow">→</span>
+    <span class="flow-chip">Resolve Role / Membership</span><span class="flow-arrow">→</span>
+    <span class="flow-chip">Check Permission</span><span class="flow-arrow">→</span>
+    <span class="flow-chip">Apply Business Scope</span><span class="flow-arrow">→</span>
+    <span class="flow-chip accent">Allow / Reject</span>
+  </div>
+  <p style="text-align:center;color:var(--ink-soft);font-size:13px;margin-top:14px;">The same person may be both a Business Admin and a Service Provider — there is no separate Sole Provider role.</p>
+`},
+{ section:'Core Booking Journey', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(6)} · Core Booking Journey</div>
+  <h1>A simple journey, an authoritative backend</h1>
+  <div class="flow-row" style="justify-content:center;flex-wrap:wrap;">
+    ${['Business Page','Service','Provider','Date &amp; Time','Review','Final Validation','CONFIRMED'].map((s,i,arr)=>`<span class="flow-chip ${i===arr.length-1?'accent':''}">${s}</span>${i<arr.length-1?'<span class="flow-arrow">→</span>':''}`).join('')}
+  </div>
+  <p class="sub center" style="margin-top:24px;">The customer sees a simple journey. The backend remains authoritative — every step is revalidated before confirmation.</p>
+`},
+{ section:'Customer Wireframes', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(7)} · Customer Wireframes</div>
+  <h1>Customer experience, screen by screen</h1>
+  <div class="grid cols-3">
+    ${[['Business Page','Browse services and hours'],['Provider Selection','Pick from eligible providers'],['Date &amp; Time','Calculated bookable slots'],['Review','Confirm details before booking'],['Confirmation','CONFIRMED — no payment collected'],['My Appointments','Upcoming and history']].map(x=>`
+    <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:4px;">${x[0]}</div><div style="font-size:12.5px;color:var(--ink-soft);">${x[1]}</div></div>`).join('')}
+  </div>
+  <p style="text-align:center;margin-top:18px;color:var(--ink-soft);font-size:13.5px;">Full interactive versions of every screen are in the Platform Walkthrough at the end of this deck.</p>
+`},
+{ section:'Operations Wireframes', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(8)} · Business &amp; Provider Wireframes</div>
+  <h1>Operational screens, by role</h1>
+  <div class="grid cols-3">
+    <div class="card"><div class="eyebrow-sm">Business Admin</div><div class="chip-list">${['Dashboard','Services','Providers','Assignments','Appointments'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+    <div class="card"><div class="eyebrow-sm">Service Provider</div><div class="chip-list">${['My Schedule','Working Hours','Block Time','Appointment Detail'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+    <div class="card"><div class="eyebrow-sm">Platform Admin</div><div class="chip-list">${['Businesses','Package Assignment'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+  </div>
+  <p style="text-align:center;margin-top:18px;color:var(--ink-soft);font-size:13.5px;">Each screen enforces a role boundary and a specific backend responsibility.</p>
+`},
+{ section:'Availability Engine', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(9)} · Availability Engine</div>
+  <h1>Availability is calculated, not stored</h1>
+  <p class="sub">"Availability is calculated from provider schedule state, not stored as empty appointment records."</p>
+  <div class="flow-row" style="justify-content:center;flex-wrap:wrap;margin-bottom:20px;">
+    <span class="flow-chip">Working Hours</span><span class="flow-arrow">−</span>
+    <span class="flow-chip">Blocked Time</span><span class="flow-arrow">−</span>
+    <span class="flow-chip">Confirmed Appointments</span><span class="flow-arrow">=</span>
+    <span class="flow-chip accent">Bookable Times</span>
+  </div>
+  <div class="card">
+    <div class="eyebrow-sm">Interactive demo — Haircut with Sarah, Friday 09:00–16:00</div>
+    <div class="btn-row" style="margin-top:6px;">
+      <span style="font-size:12.5px;color:var(--ink-soft);align-self:center;">Duration:</span>
+      ${[20,30,45,60].map(d=>`<button class="btn btn-sm ${availDuration===d?'btn-primary':'btn-outline'}" onclick="availDuration=${d};renderDeck()">${d} min</button>`).join('')}
+      <span style="font-size:12.5px;color:var(--ink-soft);align-self:center;margin-left:8px;">Interval:</span>
+      ${[15,30].map(d=>`<button class="btn btn-sm ${availInterval===d?'btn-primary':'btn-outline'}" onclick="availInterval=${d};renderDeck()">${d} min</button>`).join('')}
+    </div>
+    <div class="btn-row" style="margin-top:2px;">
+      <label class="checkbox-row"><input type="checkbox" ${availBlocked?'checked':''} onchange="availBlocked=this.checked;renderDeck()"> Blocked time 12:00–13:00</label>
+      <label class="checkbox-row"><input type="checkbox" ${availBooked?'checked':''} onchange="availBooked=this.checked;renderDeck()"> Existing appointment 10:30–11:00</label>
+    </div>
+    <div class="slot-grid" style="margin-top:10px;">
+      ${computeDemoSlots().map(s=>`<div class="slot-btn ${s.status!=='available'?s.status:''}" style="cursor:default;">${s.t}${s.status!=='available'?'<br><span style="font-size:10px">'+(s.status==='booked'?'Booked':'Blocked')+'</span>':''}</div>`).join('')}
+    </div>
+  </div>
+  <div class="banner info" style="margin-top:14px;"><span>ℹ</span><div class="mono" style="font-size:12px;">Overlap when: candidateStart &lt; existingEnd AND candidateEnd &gt; existingStart</div></div>
+`},
+{ section:'Appointment Lifecycle', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(10)} · Appointment Lifecycle</div>
+  <h1>Four states. No PENDING.</h1>
+  <div style="text-align:center;margin:10px 0 26px;">
+    <span class="badge confirmed" style="font-size:14px;padding:8px 18px;">CONFIRMED</span>
+    <div style="color:var(--ink-faint);font-size:20px;margin:6px 0;">↙&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;↘</div>
+    <span class="badge cancelled" style="font-size:13px;padding:6px 14px;">CANCELLED</span>
+    <span class="badge completed" style="font-size:13px;padding:6px 14px;margin:0 8px;">COMPLETED</span>
+    <span class="badge noshow" style="font-size:13px;padding:6px 14px;">NO_SHOW</span>
+  </div>
+  <div class="grid cols-4">
+    <div class="card"><div class="badge confirmed" style="margin-bottom:8px;">CONFIRMED</div><div style="font-size:13px;color:var(--ink-soft);">Active appointment.</div></div>
+    <div class="card"><div class="badge cancelled" style="margin-bottom:8px;">CANCELLED</div><div style="font-size:13px;color:var(--ink-soft);">Future capacity released.</div></div>
+    <div class="card"><div class="badge completed" style="margin-bottom:8px;">COMPLETED</div><div style="font-size:13px;color:var(--ink-soft);">Service occurred.</div></div>
+    <div class="card"><div class="badge noshow" style="margin-bottom:8px;">NO_SHOW</div><div style="font-size:13px;color:var(--ink-soft);">Customer did not attend. Provider/Admin only, after appointment time.</div></div>
+  </div>
+`},
+{ section:'Exception Handling', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(11)} · Exception Handling</div>
+  <h1>What happens when things don't go as planned</h1>
+  <div class="tab-row">${EXC_SCENARIOS.map((s,i)=>`<button class="tab-btn ${excSelected===i?'active':''}" onclick="excSelected=${i};renderDeck()">${s.name}</button>`).join('')}</div>
+  ${(()=>{ const s = EXC_SCENARIOS[excSelected]; return `
+  <div class="card">
+    <div class="grid cols-2">
+      <div><div class="eyebrow-sm">Validation</div><div style="font-size:13.5px;margin-bottom:12px;">${s.validation}</div>
+      <div class="eyebrow-sm">Decision</div><div style="font-size:13.5px;">${s.decision}</div></div>
+      <div><div class="eyebrow-sm">User Feedback</div>
+      <div class="banner ${s.tone}" style="margin-bottom:12px;"><span>${s.tone==='error'?'⚠':'ℹ'}</span><div>${s.feedback}</div></div>
+      <div class="eyebrow-sm">Final State</div><div style="font-size:13.5px;font-weight:600;">${s.final}</div></div>
+    </div>
+  </div>`;})()}
+`},
+{ section:'Packages & Entitlement', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(12)} · Packages &amp; Entitlement</div>
+  <h1>Package controls active provider capacity</h1>
+  <p class="sub">Example packaging — configurable. No monthly price, checkout, or billing shown here.</p>
+  <div class="grid cols-3">
+    <div class="card"><div style="font-weight:700;font-size:15px;">Starter</div><div style="color:var(--ink-soft);font-size:13px;margin-top:6px;">1 provider</div></div>
+    <div class="card" style="border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);"><div style="font-weight:700;font-size:15px;">Professional</div><div style="color:var(--ink-soft);font-size:13px;margin-top:6px;">5 providers</div></div>
+    <div class="card"><div style="font-weight:700;font-size:15px;">Enterprise</div><div style="color:var(--ink-soft);font-size:13px;margin-top:6px;">Configurable</div></div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <div class="title-row"><span style="font-weight:700;">Precision Barbers</span><span class="badge info">Professional</span></div>
+    <div class="kv"><span class="k">Active Providers</span><span class="v">2 / 5</span></div>
+  </div>
+  <p style="text-align:center;margin-top:14px;font-weight:600;">Platform Admin assigns package entitlement.</p>
+`},
+{ section:'One Engine, Different Businesses', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(13)} · One Engine, Different Businesses</div>
+  <h1>The industry changes. The scheduling engine does not.</h1>
+  <div class="tab-row">${DEMO_BIZ.map((b,i)=>`<button class="tab-btn ${bizTabSelected===i?'active':''}" onclick="bizTabSelected=${i};renderDeck()">${b.name}</button>`).join('')}</div>
+  ${(()=>{ const b = DEMO_BIZ[bizTabSelected]; return `
+  <div class="card">
+    <div class="eyebrow-sm">${b.name}</div>
+    <div class="grid cols-4" style="margin-top:8px;">
+      <div class="metric-card"><div class="val" style="font-size:16px;">${b.service}</div><div class="lbl">Service</div></div>
+      <div class="metric-card"><div class="val" style="font-size:16px;">${b.duration}</div><div class="lbl">Duration</div></div>
+      <div class="metric-card"><div class="val" style="font-size:16px;">${b.price}</div><div class="lbl">Expected Price</div></div>
+      <div class="metric-card"><div class="val" style="font-size:16px;">${b.provider}</div><div class="lbl">Provider</div></div>
+    </div>
+  </div>`;})()}
+  <div class="flow-row" style="justify-content:center;margin-top:20px;">
+    <span class="flow-chip">Business</span><span class="flow-arrow">+</span><span class="flow-chip">Service</span><span class="flow-arrow">+</span><span class="flow-chip">Provider</span><span class="flow-arrow">+</span><span class="flow-chip">Duration</span><span class="flow-arrow">+</span><span class="flow-chip">Availability</span><span class="flow-arrow">=</span><span class="flow-chip accent">Appointment</span>
+  </div>
+`},
+{ section:'Conceptual Data Model', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(14)} · Conceptual Data Model</div>
+  <h1>What does the system need to remember?</h1>
+  <div class="grid cols-4">
+    <div><div class="col-title" style="background:var(--accent-soft);color:var(--accent);">Identity</div><div class="chip-list">${['User','BusinessMembership'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+    <div><div class="col-title" style="background:#F1F2F4;color:var(--ink-soft);">Business</div><div class="chip-list">${['Business','Service','ServiceProvider'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+    <div><div class="col-title" style="background:var(--success-bg);color:var(--success);">Scheduling</div><div class="chip-list">${['ProviderService','Availability','Unavailability'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+    <div><div class="col-title" style="background:var(--warning-bg);color:var(--warning);">Entitlement</div><div class="chip-list">${['Package','BusinessSubscription'].map(x=>`<span class="chip">${x}</span>`).join('')}</div></div>
+  </div>
+  <div class="card" style="margin-top:14px;text-align:center;">
+    <div class="col-title" style="display:inline-block;background:var(--accent);color:#fff;">Transaction</div>
+    <div class="chip-list" style="justify-content:center;display:flex;margin-top:8px;"><span class="chip">Appointment</span></div>
+  </div>
+`},
+{ section:'Logical ERD', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(15)} · Clean Logical ERD</div>
+  <h1>Readable in under 30 seconds</h1>
+  <div class="grid cols-3">
+    <div>
+      <div class="ent-card identity"><div class="name">USER</div><div class="field pk">id PK</div><div class="field">email</div><div class="field">platform_role</div></div>
+      <div class="cardinality">1 : N ↓</div>
+      <div class="ent-card identity"><div class="name">BUSINESS MEMBERSHIP</div><div class="field pk">id PK</div><div class="field">user_id FK</div><div class="field">business_id FK</div><div class="field">role</div></div>
+      <div class="cardinality">N : 1 ↓</div>
+      <div class="ent-card business"><div class="name">BUSINESS</div><div class="field pk">id PK</div><div class="field">name</div><div class="field">active</div></div>
+    </div>
+    <div>
+      <div class="ent-card business"><div class="name">SERVICE</div><div class="field pk">id PK</div><div class="field">business_id FK</div><div class="field">name / duration / price</div><div class="field">active</div></div>
+      <div class="cardinality">N : M</div>
+      <div class="ent-card scheduling"><div class="name">PROVIDER SERVICE</div><div class="field">provider_id FK</div><div class="field">service_id FK</div></div>
+      <div class="cardinality">M : N</div>
+      <div class="ent-card business"><div class="name">SERVICE PROVIDER</div><div class="field pk">id PK</div><div class="field">business_id FK</div><div class="field">membership_id FK</div><div class="field">active</div></div>
+      <div class="cardinality">1 : N ↓</div>
+      <div class="ent-card scheduling"><div class="name">AVAILABILITY / UNAVAILABILITY</div><div class="field">provider_id FK</div><div class="field">day / start / end</div></div>
+    </div>
+    <div>
+      <div class="ent-card appt"><div class="name">APPOINTMENT</div><div class="field pk">id PK</div><div class="field">customer_user_id FK</div><div class="field">business_id / service_id / provider_id FK</div><div class="field">start_at / end_at</div><div class="field">status</div><div class="field">booked_price</div></div>
+      <div class="cardinality">N : 1 ↓</div>
+      <div class="ent-card package"><div class="name">PACKAGE</div><div class="field pk">id PK</div><div class="field">name</div><div class="field">provider_limit</div></div>
+      <div class="cardinality">1 : N ↓</div>
+      <div class="ent-card package"><div class="name">BUSINESS SUBSCRIPTION</div><div class="field">business_id FK</div><div class="field">package_id FK</div><div class="field">status</div></div>
+    </div>
+  </div>
+`},
+{ section:'Screen → Backend → Data', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(16)} · Screen → Backend → Data</div>
+  <h1>General Consultation · Dr Ndlovu · 10:00</h1>
+  <div class="grid cols-3">
+    <div class="card"><div class="eyebrow-sm">1 · Request Availability</div>
+      <div class="kv"><span class="k">Screen</span><span class="v">Date &amp; Time</span></div>
+      <div class="kv"><span class="k">Backend</span><span class="v" style="font-weight:400;text-align:right;">eligibility, hours, blocks, bookings, duration</span></div>
+      <div class="kv"><span class="k">Data</span><span class="v" style="font-weight:400;text-align:right;">Service, Provider, ProviderService, Availability</span></div>
+      <div class="kv"><span class="k">Response</span><span class="v">Valid times</span></div></div>
+    <div class="card"><div class="eyebrow-sm">2 · Create Appointment</div>
+      <div class="kv"><span class="k">Screen</span><span class="v">Review</span></div>
+      <div class="kv"><span class="k">Backend</span><span class="v" style="font-weight:400;text-align:right;">authenticate, final validation, capture price</span></div>
+      <div class="kv"><span class="k">Response</span><span class="v">CONFIRMED</span></div></div>
+    <div class="card"><div class="eyebrow-sm">3 · Surface Result</div>
+      <div class="kv"><span class="k">Customer</span><span class="v">My Appointments</span></div>
+      <div class="kv"><span class="k">Provider</span><span class="v">My Schedule</span></div>
+      <div class="kv"><span class="k">Business</span><span class="v">Appointments</span></div></div>
+  </div>
+`},
+{ section:'Technical Architecture', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(17)} · Technical Architecture</div>
+  <h1>Three clean layers</h1>
+  <div class="card" style="text-align:center;">
+    <div class="flow-chip" style="display:inline-flex;">React · TypeScript · Vite</div>
+    <div style="color:var(--ink-faint);margin:8px 0;">↓</div>
+    <div class="flow-chip accent" style="display:inline-flex;">Node.js · Express · TypeScript</div>
+    <div class="chip-list" style="justify-content:center;display:flex;margin:10px 0;">${['Authentication','Authorization','Tenant Scoping','Business Rules','Availability','Appointment Validation'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+    <div style="color:var(--ink-faint);margin:8px 0;">↓</div>
+    <div class="flow-chip" style="display:inline-flex;">PostgreSQL</div>
+  </div>
+  <div class="chip-list" style="justify-content:center;display:flex;margin-top:16px;">${['Git','GitHub','Postman','ESLint','DevTools'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+  <p style="text-align:center;color:var(--ink-faint);font-size:12.5px;margin-top:12px;">Raw SQL first → Prisma later</p>
+`},
+{ section:'Future Direction', render: ()=>`
+  <div class="slide-eyebrow">${screenLabel(18)} · Future Direction</div>
+  <h1>Future / Premium Direction <span style="font-size:13px;font-weight:600;color:var(--ink-faint);">(not MVP commitment)</span></h1>
+  <div class="grid cols-3">
+    ${[['Automated Reminders',''],['Calendar Sync',''],['Waitlist Recovery',''],['Provider Utilisation Insights','"Where are we underutilised?"'],['Multi-location / API Integrations',''],['AI Operations Assistant','"What appointment options exist after 16:00?"']].map(x=>`<div class="card"><div style="font-weight:700;font-size:14px;">${x[0]}</div>${x[1]?`<div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;font-style:italic;">${x[1]}</div>`:''}</div>`).join('')}
+  </div>
+`},
+{ section:'Walkthrough Intro', render: ()=>`
+  <div class="slide-eyebrow" style="text-align:center;">${screenLabel(19)} · Platform Walkthrough</div>
+  <h1 class="center" style="margin-top:20px;">Explore the Platform</h1>
+  <p class="sub center">See how one appointment moves through business configuration, provider availability, customer booking and platform administration.</p>
+  <div class="grid cols-4" style="max-width:820px;margin:0 auto;">
+    <div class="card" style="text-align:center;"><div style="font-weight:700;">Customer</div></div>
+    <div class="card" style="text-align:center;"><div style="font-weight:700;">Business Admin</div></div>
+    <div class="card" style="text-align:center;"><div style="font-weight:700;">Service Provider</div></div>
+    <div class="card" style="text-align:center;"><div style="font-weight:700;">Platform Admin</div></div>
+  </div>
+  <div class="btn-row" style="justify-content:center;margin-top:30px;">
+    <button class="btn btn-primary" onclick="enterWalkthrough();startGuided()">▶ Start Guided Walkthrough</button>
+    <button class="btn btn-outline" onclick="enterWalkthrough()">Explore Freely</button>
+  </div>
+  <p style="text-align:center;color:var(--ink-faint);font-size:12.5px;margin-top:18px;">The screens you are about to use are driven by the same product rules demonstrated in this presentation.</p>
+`},
+];
+
+/* ============================= DECK RENDER / NAV ============================= */
+function renderDeck(){
+  const app = document.getElementById('app');
+  const s = SLIDES[DECK.index];
+  const pct = ((DECK.index+1)/SLIDES.length)*100;
+  app.innerHTML = `
+  <div class="deck-shell">
+    <div class="deck-topbar">
+      <div class="brand"><span class="dot"></span>AppointHub</div>
+      <div class="section-label">${s.section}</div>
+      <div class="counter">${String(DECK.index+1).padStart(2,'0')} / ${String(SLIDES.length).padStart(2,'0')}</div>
+    </div>
+    <div class="deck-progress"><div class="deck-progress-fill" style="width:${pct}%;"></div></div>
+    <div class="deck-body"><div class="slide">${s.render()}</div></div>
+    <div class="deck-bottombar">
+      <button class="deck-nav-btn" onclick="deckPrev()" ${DECK.index===0?'disabled':''}>← Previous</button>
+      <div class="deck-dots">${SLIDES.map((_,i)=>`<span class="${i===DECK.index?'on':''}"></span>`).join('')}</div>
+      <div style="display:flex;gap:10px;">
+        <button class="deck-nav-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+        ${DECK.index===SLIDES.length-1 ? '' : `<button class="deck-nav-btn" style="background:var(--ink);color:#fff;border-color:var(--ink);" onclick="deckNext()">Next →</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+function deckNext(){ if(DECK.index < SLIDES.length-1){ DECK.index++; renderDeck(); } }
+function deckPrev(){ if(DECK.index > 0){ DECK.index--; renderDeck(); } }
+function toggleFullscreen(){
+  if(!document.fullscreenElement){ document.documentElement.requestFullscreen().catch(()=>{}); }
+  else { document.exitFullscreen().catch(()=>{}); }
+}
+document.addEventListener('keydown', (e)=>{
+  if(APP.mode !== 'deck') return;
+  if(e.key==='ArrowRight'||e.key===' ') { deckNext(); }
+  else if(e.key==='ArrowLeft'){ deckPrev(); }
+  else if(e.key==='Home'){ DECK.index=0; renderDeck(); }
+  else if(e.key==='End'){ DECK.index=SLIDES.length-1; renderDeck(); }
+});
+
+/* ============================= INIT ============================= */
+renderRoot();
+</script>
+</body>
+</html>
