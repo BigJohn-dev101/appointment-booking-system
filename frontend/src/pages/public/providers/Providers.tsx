@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -6,12 +6,13 @@ import {
   type Provider,
 } from "../../../data/providers";
 
+const PROVIDERS_PER_PAGE = 6;
+
 export default function Providers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Generate categories from the mock provider data.
-  // This means we do not need to maintain a second category list manually.
   const categories = useMemo(() => {
     return [
       "All",
@@ -21,7 +22,6 @@ export default function Providers() {
     ];
   }, []);
 
-  // Filter providers using both the search query and selected category.
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
@@ -42,6 +42,23 @@ export default function Providers() {
     });
   }, [searchQuery, selectedCategory]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredProviders.length / PROVIDERS_PER_PAGE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedProviders = filteredProviders.slice(
+    (currentPage - 1) * PROVIDERS_PER_PAGE,
+    currentPage * PROVIDERS_PER_PAGE
+  );
+
   function clearFilters() {
     setSearchQuery("");
     setSelectedCategory("All");
@@ -50,14 +67,10 @@ export default function Providers() {
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Page header */}
-      <section className="border-b border-slate-200 bg-white">
+      <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <div className="max-w-3xl">
-            <span className="text-sm font-semibold uppercase tracking-wider text-[#0EA5E9]">
-              Providers
-            </span>
-
-            <h1 className="mt-3 text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">
+            <h1 className="font-[Clash_Display] text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">
               Find a service provider
             </h1>
 
@@ -70,10 +83,9 @@ export default function Providers() {
       </section>
 
       {/* Search and category filters */}
-      <section className="border-b border-slate-200 bg-white">
+      <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           <div className="flex flex-col gap-6">
-            {/* Search */}
             <div className="relative max-w-2xl">
               <svg
                 viewBox="0 0 24 24"
@@ -94,11 +106,10 @@ export default function Providers() {
                   setSearchQuery(event.target.value)
                 }
                 placeholder="Search providers or services..."
-                className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-12 pr-4 text-sm text-[#334155] outline-none transition placeholder:text-slate-400 focus:border-[#0EA5E9] focus:ring-4 focus:ring-sky-100"
+                className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-12 pr-4 text-sm text-[#334155] outline-none transition focus:border-[#0EA5E9] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400"
               />
             </div>
 
-            {/* Categories */}
             <div className="flex flex-wrap gap-2">
               {categories.map((category) => {
                 const isSelected = selectedCategory === category;
@@ -107,12 +118,10 @@ export default function Providers() {
                   <button
                     key={category}
                     type="button"
-                    onClick={() =>
-                      setSelectedCategory(category)
-                    }
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    onClick={() => setSelectedCategory(category)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       isSelected
-                        ? "bg-[#0EA5E9] text-white shadow-sm"
+                        ? "bg-[#0EA5E9] text-white shadow-[0_4px_14px_-4px_rgba(14,165,233,0.5)]"
                         : "border border-slate-200 bg-white text-[#334155] hover:border-[#0EA5E9] hover:text-[#0EA5E9]"
                     }`}
                   >
@@ -123,12 +132,13 @@ export default function Providers() {
             </div>
           </div>
         </div>
+
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#0EA5E9]/25 to-transparent" />
       </section>
 
       {/* Provider results */}
       <section className="py-14 sm:py-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          {/* Results heading */}
           <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-[#0F172A]">
@@ -137,10 +147,7 @@ export default function Providers() {
 
               <p className="mt-1 text-sm text-slate-500">
                 {filteredProviders.length}{" "}
-                {filteredProviders.length === 1
-                  ? "provider"
-                  : "providers"}{" "}
-                found
+                {filteredProviders.length === 1 ? "provider" : "providers"} found
               </p>
             </div>
 
@@ -148,23 +155,58 @@ export default function Providers() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="self-start text-sm font-semibold text-[#0EA5E9] transition hover:text-sky-700 sm:self-auto"
+                className="self-start text-sm font-semibold text-[#0EA5E9] transition-colors hover:text-sky-700 sm:self-auto"
               >
                 Clear filters
               </button>
             )}
           </div>
 
-          {/* Provider cards */}
           {filteredProviders.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {filteredProviders.map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {paginatedProviders.map((provider) => (
+                  <ProviderCard key={provider.id} provider={provider} />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`h-10 w-10 rounded-lg text-sm font-semibold transition-colors ${
+                        currentPage === page
+                          ? "bg-[#0EA5E9] text-white shadow-[0_4px_14px_-4px_rgba(14,165,233,0.5)]"
+                          : "border border-slate-200 bg-white text-slate-600 hover:border-[#0EA5E9] hover:text-[#0EA5E9]"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyState onClear={clearFilters} />
           )}
@@ -174,18 +216,13 @@ export default function Providers() {
   );
 }
 
-function ProviderCard({
-  provider,
-}: {
-  provider: Provider;
-}) {
+function ProviderCard({ provider }: { provider: Provider }) {
   const isOpen = provider.status === "Open";
 
   return (
-    <article className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-sky-200 hover:shadow-xl hover:shadow-slate-200/60">
-      {/* Provider header */}
+    <article className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-[#0EA5E9]/40 hover:shadow-xl hover:shadow-slate-200/60">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#0F172A] text-sm font-bold text-white">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] font-[Clash_Display] text-sm font-bold text-[#38BDF8] ring-1 ring-white/10">
           {provider.initials}
         </div>
 
@@ -201,12 +238,10 @@ function ProviderCard({
               isOpen ? "bg-[#22C55E]" : "bg-slate-400"
             }`}
           />
-
           {provider.status}
         </span>
       </div>
 
-      {/* Provider information */}
       <div className="mt-6 flex-1">
         <h3 className="text-xl font-semibold text-[#0F172A]">
           {provider.name}
@@ -220,11 +255,8 @@ function ProviderCard({
           {provider.description}
         </p>
 
-        {/* Service preview */}
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Services
-          </p>
+          <p className="text-xs font-medium text-slate-400">Services</p>
 
           <div className="mt-2 flex flex-wrap gap-2">
             {provider.services.slice(0, 2).map((service) => (
@@ -245,11 +277,10 @@ function ProviderCard({
         </div>
       </div>
 
-      {/* Business information */}
       <div className="mt-6 border-t border-slate-100 pt-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-medium text-slate-400">
               Business hours
             </p>
 
@@ -259,9 +290,7 @@ function ProviderCard({
           </div>
 
           <div className="text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Services
-            </p>
+            <p className="text-xs font-medium text-slate-400">Services</p>
 
             <p className="mt-1 text-sm font-semibold text-[#334155]">
               {provider.services.length}
@@ -271,53 +300,44 @@ function ProviderCard({
 
         <Link
           to={`/providers/${provider.id}`}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-600"
+          className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(14,165,233,0)] transition-all duration-200 hover:bg-[#38BDF8] hover:shadow-[0_0_20px_-4px_rgba(14,165,233,0.5)]"
         >
           View services
-
-          <span aria-hidden="true">→</span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+            aria-hidden="true"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
         </Link>
       </div>
     </article>
   );
 }
 
-function EmptyState({
-  onClear,
-}: {
-  onClear: () => void;
-}) {
+function EmptyState({ onClear }: { onClear: () => void }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="h-5 w-5"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-      </div>
-
-      <h3 className="mt-5 text-lg font-semibold text-[#0F172A]">
-        No providers found
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+      <h3 className="font-[Clash_Display] text-2xl font-bold text-[#0F172A]">
+        No providers match your search
       </h3>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-        We couldn't find a provider matching your search. Try another
-        service, provider name, or category.
+      <p className="mt-4 text-sm leading-7 text-slate-500">
+        Try adjusting your category or search keyword to find more providers.
       </p>
 
       <button
         type="button"
         onClick={onClear}
-        className="mt-6 rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-600"
+        className="mt-6 rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-600"
       >
-        Clear filters
+        Reset filters
       </button>
     </div>
   );

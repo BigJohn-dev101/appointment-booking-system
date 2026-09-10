@@ -1,20 +1,28 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { providers } from "../../../data/providers";
 
+const SERVICES_PER_PAGE = 6;
+
 export default function ProviderProfile() {
   const { id } = useParams();
+  const [servicePage, setServicePage] = useState(1);
 
   const provider = providers.find(
     (provider) => provider.id === Number(id)
   );
+
+  useEffect(() => {
+    setServicePage(1);
+  }, [provider?.id]);
 
   if (!provider) {
     return (
       <section className="min-h-[60vh] bg-[#F8FAFC]">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
           <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-            <h1 className="text-3xl font-bold text-[#0F172A]">
+            <h1 className="font-[Clash_Display] text-3xl font-bold text-[#0F172A]">
               Provider not found
             </h1>
 
@@ -25,7 +33,7 @@ export default function ProviderProfile() {
 
             <Link
               to="/providers"
-              className="mt-6 inline-flex rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-600"
+              className="mt-6 inline-flex rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-600"
             >
               Back to providers
             </Link>
@@ -36,23 +44,42 @@ export default function ProviderProfile() {
   }
 
   const isOpen = provider.status === "Open";
+  const totalServicePages = Math.max(
+    1,
+    Math.ceil(provider.services.length / SERVICES_PER_PAGE)
+  );
+  const paginatedServices = provider.services.slice(
+    (servicePage - 1) * SERVICES_PER_PAGE,
+    servicePage * SERVICES_PER_PAGE
+  );
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Provider heading */}
-      <section className="border-b border-slate-200 bg-white">
+      <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
           <Link
             to="/providers"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#0EA5E9] transition hover:text-sky-700"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0EA5E9] transition-colors hover:text-sky-700"
           >
-            <span aria-hidden="true">←</span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+              aria-hidden="true"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
             Back to providers
           </Link>
 
           <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[#0F172A] text-xl font-bold text-white">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] font-[Clash_Display] text-xl font-bold text-[#38BDF8] ring-1 ring-white/10">
                 {provider.initials}
               </div>
 
@@ -74,12 +101,11 @@ export default function ProviderProfile() {
                         isOpen ? "bg-[#22C55E]" : "bg-slate-400"
                       }`}
                     />
-
                     {provider.status}
                   </span>
                 </div>
 
-                <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">
+                <h1 className="mt-2 font-[Clash_Display] text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">
                   {provider.name}
                 </h1>
 
@@ -90,7 +116,7 @@ export default function ProviderProfile() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] px-5 py-4 md:min-w-52">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="text-xs font-medium text-slate-400">
                 Business hours
               </p>
 
@@ -100,6 +126,8 @@ export default function ProviderProfile() {
             </div>
           </div>
         </div>
+
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#0EA5E9]/25 to-transparent" />
       </section>
 
       {/* Services */}
@@ -107,11 +135,7 @@ export default function ProviderProfile() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-[#0EA5E9]">
-                Services
-              </p>
-
-              <h2 className="mt-2 text-3xl font-bold text-[#0F172A]">
+              <h2 className="font-[Clash_Display] text-3xl font-bold text-[#0F172A]">
                 Choose a service
               </h2>
 
@@ -128,10 +152,10 @@ export default function ProviderProfile() {
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {provider.services.map((service) => (
+            {paginatedServices.map((service) => (
               <article
                 key={service.id}
-                className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-sky-200 hover:shadow-xl hover:shadow-slate-200/60"
+                className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-[#0EA5E9]/40 hover:shadow-xl hover:shadow-slate-200/60"
               >
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-[#0F172A]">
@@ -144,7 +168,7 @@ export default function ProviderProfile() {
 
                   <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      <p className="text-xs font-medium text-slate-400">
                         Duration
                       </p>
 
@@ -154,7 +178,7 @@ export default function ProviderProfile() {
                     </div>
 
                     <div className="text-right">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      <p className="text-xs font-medium text-slate-400">
                         Price
                       </p>
 
@@ -167,13 +191,50 @@ export default function ProviderProfile() {
 
                 <Link
                   to={`/providers/${provider.id}/book?service=${service.id}`}
-                  className="mt-6 flex w-full items-center justify-center rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-600"
+                  className="mt-6 flex w-full items-center justify-center rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(14,165,233,0)] transition-all duration-200 hover:bg-[#38BDF8] hover:shadow-[0_0_20px_-4px_rgba(14,165,233,0.5)]"
                 >
                   Book appointment
                 </Link>
               </article>
             ))}
           </div>
+
+          {totalServicePages > 1 && (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setServicePage((page) => Math.max(1, page - 1))}
+                disabled={servicePage === 1}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+
+              {Array.from({ length: totalServicePages }, (_, index) => index + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setServicePage(page)}
+                  className={`h-10 w-10 rounded-lg text-sm font-semibold transition-colors ${
+                    servicePage === page
+                      ? "bg-[#0EA5E9] text-white shadow-[0_4px_14px_-4px_rgba(14,165,233,0.5)]"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-[#0EA5E9] hover:text-[#0EA5E9]"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setServicePage((page) => Math.min(totalServicePages, page + 1))}
+                disabled={servicePage === totalServicePages}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </div>

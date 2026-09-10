@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@600,700&display=swap');
 
 :root {
   --color-primary: #0f172a;
