@@ -33,12 +33,13 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0EA5E9] font-bold text-white">
-                A
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#0EA5E9] font-[Clash_Display] text-base font-bold text-[#0F172A] shadow-[0_0_20px_-4px_rgba(14,165,233,0.6)]">
+                IT
               </div>
 
-              <h3 className="text-lg font-semibold">
-                AppointHub
+              <h3 className="font-[Clash_Display] text-xl font-extrabold tracking-tight">
+                <span className="text-white">ITThynk</span>
+                <span className="text-[#38BDF8]">Appoint</span>
               </h3>
             </Link>
 
@@ -46,20 +47,31 @@ export default function Footer() {
               Helping service businesses manage appointments, staff schedules,
               and customer bookings with confidence.
             </p>
+
+            <div className="mt-6 flex gap-3">
+              {socialLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  aria-label={link.label}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-xs font-medium text-slate-400 transition-colors hover:border-[#0EA5E9]/50 hover:text-[#38BDF8]"
+                >
+                  {link.label.charAt(0)}
+                </a>
+              ))}
+            </div>
           </div>
 
           {/* Product */}
           <div>
-            <h4 className="text-sm font-semibold text-white">
-              Product
-            </h4>
+            <h4 className="text-sm font-semibold text-white">Product</h4>
 
             <ul className="mt-5 space-y-3">
               {productLinks.map((link) => (
                 <li key={link.label}>
                   <Link
                     to={link.to}
-                    className="text-sm text-slate-400 transition hover:text-[#0EA5E9]"
+                    className="text-sm text-slate-400 transition-colors hover:text-[#38BDF8]"
                   >
                     {link.label}
                   </Link>
@@ -70,16 +82,14 @@ export default function Footer() {
 
           {/* Company */}
           <div>
-            <h4 className="text-sm font-semibold text-white">
-              Company
-            </h4>
+            <h4 className="text-sm font-semibold text-white">Company</h4>
 
             <ul className="mt-5 space-y-3">
               {companyLinks.map((link) => (
                 <li key={link.label}>
                   <Link
                     to={link.to}
-                    className="text-sm text-slate-400 transition hover:text-[#0EA5E9]"
+                    className="text-sm text-slate-400 transition-colors hover:text-[#38BDF8]"
                   >
                     {link.label}
                   </Link>
@@ -90,16 +100,14 @@ export default function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="text-sm font-semibold text-white">
-              Legal
-            </h4>
+            <h4 className="text-sm font-semibold text-white">Legal</h4>
 
             <ul className="mt-5 space-y-3">
               {legalLinks.map((link) => (
                 <li key={link.label}>
                   <Link
                     to={link.to}
-                    className="text-sm text-slate-400 transition hover:text-[#0EA5E9]"
+                    className="text-sm text-slate-400 transition-colors hover:text-[#38BDF8]"
                   >
                     {link.label}
                   </Link>
@@ -109,18 +117,19 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Gradient hairline, matches navbar */}
+        <div className="mt-14 h-px w-full bg-gradient-to-r from-transparent via-[#0EA5E9]/40 to-transparent" />
+
         {/* Bottom */}
-        <div className="mt-14 flex flex-col gap-5 border-t border-white/10 pt-7 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            © {new Date().getFullYear()} AppointHub. All rights reserved.
-          </p>
+        <div className="flex flex-col gap-5 pt-7 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} ITThynkAppoint. All rights reserved.</p>
 
           <div className="flex flex-wrap gap-5">
             {socialLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="transition hover:text-[#0EA5E9]"
+                className="transition-colors hover:text-[#38BDF8]"
               >
                 {link.label}
               </a>
