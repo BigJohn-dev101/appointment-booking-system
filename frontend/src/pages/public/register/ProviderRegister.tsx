@@ -59,6 +59,7 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function ProviderRegister() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);;
   const [form, setForm] = useState({
     fullName: "",
     serviceName: "",
@@ -92,6 +93,8 @@ export default function ProviderRegister() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       const response = await fetch(
         "http://localhost:5000/api/auth/register/provider",
@@ -122,6 +125,8 @@ export default function ProviderRegister() {
       console.error("Provider registration request failed:", error);
 
       toast.error("Unable to connect to the server.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -412,9 +417,20 @@ export default function ProviderRegister() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#0F766E] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(15,118,110,0)] transition-all duration-200 hover:bg-[#14B8A6] hover:shadow-[0_0_24px_-4px_rgba(15,118,110,0.5)]"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(15,118,110,0)] transition-all duration-200 ${isSubmitting
+                      ? "cursor-not-allowed bg-teal-400 opacity-70"
+                      : "bg-[#0F766E] hover:bg-[#14B8A6] hover:shadow-[0_0_24px_-4px_rgba(15,118,110,0.5)]"
+                    }`}
                 >
-                  Create provider account
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Creating account...
+                    </span>
+                  ) : (
+                    "Create provider account"
+                  )}
                 </button>
               </form>
 

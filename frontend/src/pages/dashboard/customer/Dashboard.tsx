@@ -140,7 +140,7 @@ export default function ClientDashboard() {
             className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-[#0EA5E9]">
-              📅
+              
             </div>
 
             <h2 className="mt-5 font-[Clash_Display] text-lg font-bold text-[#0F172A]">
@@ -157,7 +157,7 @@ export default function ClientDashboard() {
             className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-[#0EA5E9]">
-              👤
+              
             </div>
 
             <h2 className="mt-5 font-[Clash_Display] text-lg font-bold text-[#0F172A]">
@@ -186,7 +186,7 @@ export default function ClientDashboard() {
 
           <div className="px-6 py-12 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">
-              📅
+              
             </div>
 
             <h3 className="mt-4 text-sm font-semibold text-[#0F172A]">

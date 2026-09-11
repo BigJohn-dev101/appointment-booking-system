@@ -93,7 +93,7 @@ export default function BusinessDashboard() {
       >
         <div className="flex h-20 items-center border-b border-gray-100 px-6">
           <Link to="/" className="text-xl font-bold">
-            <span style={{ color: ACCENT }}>Appoint</span>ly
+            <span style={{ color: ACCENT }}>ITThynkAppoint</span>
           </Link>
         </div>
 
