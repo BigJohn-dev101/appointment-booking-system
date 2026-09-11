@@ -72,6 +72,7 @@ export default function BusinessRegister() {
     packageTier: "BASIC" as PackageTier,
     agree: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
@@ -101,6 +102,8 @@ export default function BusinessRegister() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       const response = await fetch(
         "http://localhost:5000/api/auth/register/business",
@@ -129,6 +132,8 @@ export default function BusinessRegister() {
       toast.error(
         "Unable to connect to the server. Please try again.",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -422,9 +427,20 @@ export default function BusinessRegister() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#F59E0B] px-6 py-3.5 text-sm font-semibold text-[#0F172A] shadow-[0_0_0_0_rgba(245,158,11,0)] transition-all duration-200 hover:bg-[#FBBF24] hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.45)]"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-xl px-6 py-3.5 text-sm font-semibold text-[#0F172A] shadow-[0_0_0_0_rgba(245,158,11,0)] transition-all duration-200 ${isSubmitting
+                      ? "cursor-not-allowed bg-amber-300 opacity-70"
+                      : "bg-[#F59E0B] hover:bg-[#FBBF24] hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.45)]"
+                    }`}
                 >
-                  Create business account
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0F172A]/30 border-t-[#0F172A]" />
+                      Creating account...
+                    </span>
+                  ) : (
+                    "Create business account"
+                  )}
                 </button>
               </form>
 

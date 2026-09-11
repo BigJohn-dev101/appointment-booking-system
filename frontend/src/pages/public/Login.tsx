@@ -51,7 +51,7 @@ export default function Login() {
           navigate("/dashboard/provider", { replace: true });
           break;
 
-        case "BUSINESS":
+        case "BUSINESS_OWNER":
           navigate("/dashboard/business", { replace: true });
           break;
 
