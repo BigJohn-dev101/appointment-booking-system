@@ -59,7 +59,7 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function ProviderRegister() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);;
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     serviceName: "",
@@ -192,7 +192,7 @@ export default function ProviderRegister() {
                       required
                       value={form.fullName}
                       onChange={(e) => update("fullName", e.target.value)}
-                      placeholder="Thabo Nkosi"
+                      placeholder="Full Names"
                       className={inputClass}
                     />
                   </div>
@@ -206,7 +206,7 @@ export default function ProviderRegister() {
                       required
                       value={form.serviceName}
                       onChange={(e) => update("serviceName", e.target.value)}
-                      placeholder="Thabo's Barbershop"
+                      placeholder="Business Name"
                       className={inputClass}
                     />
                   </div>
@@ -223,7 +223,7 @@ export default function ProviderRegister() {
                       required
                       value={form.email}
                       onChange={(e) => update("email", e.target.value)}
-                      placeholder="thabo@example.com"
+                      placeholder="businessname@example.com"
                       className={inputClass}
                     />
                   </div>

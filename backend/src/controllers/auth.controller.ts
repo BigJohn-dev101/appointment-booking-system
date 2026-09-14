@@ -3,6 +3,41 @@ import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+
+const USER_ROLE_INCLUDE = {
+  soleProvider: true,
+  business: true,
+  businessStaff: {
+    include: {
+      business: true,
+    },
+  },
+} as const;
+
+type UserWithRoleData = Awaited<
+  ReturnType<
+    typeof prisma.user.findUnique<{
+      where: { id: string };
+      include: typeof USER_ROLE_INCLUDE;
+    }>
+  >
+>;
+
+
+function serializeUser(user: NonNullable<UserWithRoleData>) {
+  const { passwordHash: _passwordHash, ...safeUser } = user;
+
+  return {
+    ...safeUser,
+    soleProvider: user.role === "SOLE_PROVIDER" ? user.soleProvider : null,
+    business: user.role === "BUSINESS_OWNER" ? user.business : null,
+    businessStaff:
+      user.role === "BUSINESS_STAFF" ? user.businessStaff : null,
+  };
+}
+
 export const registerCustomer = async (
   req: Request,
   res: Response,
@@ -22,6 +57,13 @@ export const registerCustomer = async (
       return res.status(400).json({
         success: false,
         message: "Full name, email and password are required",
+      });
+    }
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
       });
     }
 
@@ -124,11 +166,19 @@ export const login = async (
       });
     }
 
-    // Find user
+    if (!EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    // Find user, including whichever role-specific relation applies
     const user = await prisma.user.findUnique({
       where: {
         email: email.toLowerCase().trim(),
       },
+      include: USER_ROLE_INCLUDE,
     });
 
     // Don't reveal whether the email exists
@@ -174,18 +224,17 @@ export const login = async (
       },
     );
 
+    res.cookie("session", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        role: user.role,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -195,6 +244,19 @@ export const login = async (
       message: "Something went wrong while logging in",
     });
   }
+};
+
+export const logout = async (_req: Request, res: Response) => {
+  res.clearCookie("session", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Logged out successfully",
+  });
 };
 
 export const getMe = async (
@@ -220,15 +282,7 @@ export const getMe = async (
       where: {
         id: authReq.user.userId,
       },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      include: USER_ROLE_INCLUDE,
     });
 
     if (!user) {
@@ -240,7 +294,7 @@ export const getMe = async (
 
     return res.status(200).json({
       success: true,
-      user,
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Get current user error:", error);
@@ -286,6 +340,13 @@ export const registerProvider = async (
         success: false,
         message:
           "Full name, service name, email, password and package are required",
+      });
+    }
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
       });
     }
 
@@ -497,6 +558,13 @@ export const registerBusiness = async (
       return res.status(400).json({
         success: false,
         message: "Please complete all required fields",
+      });
+    }
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
       });
     }
 

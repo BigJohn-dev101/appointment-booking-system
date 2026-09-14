@@ -4,6 +4,7 @@ import {
   registerProvider,
   registerBusiness,
   login,
+  logout,
   getMe,
 } from "../controllers/auth.controller.js";
 import {
@@ -18,6 +19,7 @@ router.post("/register/provider", registerProvider);
 router.post("/register/business", registerBusiness);
 
 router.post("/login", login);
+router.post("/logout", logout);
 
 router.get("/me", authenticate, getMe);
 
