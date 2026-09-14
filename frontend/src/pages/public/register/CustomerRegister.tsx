@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
@@ -17,6 +18,7 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function CustomerRegister() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -26,11 +28,30 @@ export default function CustomerRegister() {
     agree: false,
   });
 
+  const navigate = useNavigate();
+
   const update = (field: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    if (form.password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (!form.agree) {
+      toast.error("Please accept the terms and privacy policy.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const response = await fetch(
@@ -47,18 +68,17 @@ export default function CustomerRegister() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.message || "Registration failed");
+        toast.error(data.message || "Registration failed");
         return;
       }
 
-      console.log("Customer registered:", data);
-
-      alert("Customer account created successfully!");
-
-      // We'll replace this with proper navigation after login/auth is built.
+      toast.success("Customer account created successfully!");
+      navigate("/login", { replace: true });
     } catch (error) {
       console.error("Registration request failed:", error);
-      alert("Unable to connect to the server.");
+      toast.error("Unable to connect to the server.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -123,7 +143,7 @@ export default function CustomerRegister() {
                     required
                     value={form.fullName}
                     onChange={(e) => update("fullName", e.target.value)}
-                    placeholder="Jane Dlamini"
+                    placeholder="Full Names"
                     className={inputClass}
                   />
                 </div>
@@ -139,7 +159,7 @@ export default function CustomerRegister() {
                       required
                       value={form.email}
                       onChange={(e) => update("email", e.target.value)}
-                      placeholder="jane@example.com"
+                      placeholder="email@example.com"
                       className={inputClass}
                     />
                   </div>
@@ -213,9 +233,10 @@ export default function CustomerRegister() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#0EA5E9] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(14,165,233,0)] transition-all duration-200 hover:bg-[#38BDF8] hover:shadow-[0_0_24px_-4px_rgba(14,165,233,0.55)]"
+                  disabled={isSubmitting}
+                  className={`w-full rounded-xl bg-[#0EA5E9] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(14,165,233,0)] transition-all duration-200 hover:bg-[#38BDF8] hover:shadow-[0_0_24px_-4px_rgba(14,165,233,0.55)] disabled:cursor-not-allowed disabled:bg-sky-300 disabled:shadow-none`}
                 >
-                  Create customer account
+                  {isSubmitting ? "Creating account..." : "Create customer account"}
                 </button>
               </form>
 

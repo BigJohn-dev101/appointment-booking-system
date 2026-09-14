@@ -1,6 +1,8 @@
 import { Route, Routes } from "react-router-dom";
 
 import PublicLayout from "../layouts/PublicLayout";
+import { ProtectedRoute } from "./ProtectedRoute";
+import { RoleRoute } from "./RoleRoute";
 
 // Public pages
 import Home from "../pages/public/Home";
@@ -47,12 +49,37 @@ export default function AppRoutes() {
         <Route path="/register/business" element={<BusinessRegister />} />
       </Route>
 
-      {/* Customer dashboard */}
-      <Route path="/dashboard/customer" element={<ClientDashboard />} />
-      {/* Provider dashboard */}
-      <Route path="/dashboard/provider" element={<ProviderDashboard />} />
-      {/* Business dashboard */}
-      <Route path="/dashboard/business" element={<BusinessDashboard />} />
+      {/* Protected dashboards */}
+      <Route
+        path="/dashboard/customer"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["CUSTOMER"]}>
+              <ClientDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/provider"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["SOLE_PROVIDER"]}>
+              <ProviderDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/business"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
+              <BusinessDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

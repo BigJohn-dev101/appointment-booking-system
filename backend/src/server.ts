@@ -1,13 +1,27 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import prisma from "./lib/prisma.js";
 import authRoutes from "./routes/auth.routes.js";
+import providerRoutes from "./routes/provider.routes.js";
+import businessRoutes from "./routes/business.routes.js";
+import customerRoutes from "./routes/customer.routes.js";
 
 const app = express();
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
-app.use(cors());
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+  }),
+);
+app.use(cookieParser());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+app.use("/api/provider", providerRoutes);
+app.use("/api/business", businessRoutes);
+app.use("/api/customer", customerRoutes);
 
 app.get("/api/health", async (_req, res) => {
   try {
