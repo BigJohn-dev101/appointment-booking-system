@@ -56,15 +56,15 @@ export default function Login() {
     }
   }
 
-  return (
-    <section className="relative h-screen overflow-hidden bg-[#0B1220]">
+    return (
+    <section className="relative h-screen overflow-hidden bg-[#F8FAFC]">
       {/* Ambient background glow */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(60% 50% at 50% 0%, rgba(14,165,233,0.18) 0%, rgba(11,18,32,0) 70%)",
+            "radial-gradient(60% 50% at 50% 0%, rgba(14,165,233,0.12) 0%, rgba(248,250,252,0) 70%)",
         }}
       />
       <div
@@ -208,14 +208,6 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Remember me */}
-                <label className="flex items-center gap-3 text-sm text-[#334155]">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 accent-[#0EA5E9]"
-                  />
-                  Remember me
-                </label>
 
                 {/* Submit */}
                 <button

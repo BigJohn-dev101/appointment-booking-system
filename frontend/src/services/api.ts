@@ -22,11 +22,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     headers,
   });
 
-  if (response.status === 401) {
+  const data = await response.json().catch(() => null);
+
+  if (response.status === 401 && path !== "/auth/login") {
     throw new ApiError("Session expired", 401);
   }
-
-  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     throw new ApiError(data?.message ?? "Something went wrong", response.status);
