@@ -57,6 +57,16 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
+function getPasswordChecks(password: string) {
+  return [
+    { label: "At least 8 characters", passed: password.length >= 8 },
+    { label: "One uppercase letter", passed: /[A-Z]/.test(password) },
+    { label: "One lowercase letter", passed: /[a-z]/.test(password) },
+    { label: "One number", passed: /\d/.test(password) },
+    { label: "One special character", passed: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
 export default function ProviderRegister() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,12 +86,19 @@ export default function ProviderRegister() {
   });
 
   const navigate = useNavigate();
+  const passwordChecks = getPasswordChecks(form.password);
+  const passwordsMatch = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
 
   const update = (field: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (!passwordChecks.every((check) => check.passed)) {
+      toast.error("Password does not meet all requirements.");
+      return;
+    }
 
     if (form.password !== form.confirmPassword) {
       toast.error("Passwords do not match.");
@@ -386,6 +403,21 @@ export default function ProviderRegister() {
                         <EyeIcon open={showPassword} />
                       </button>
                     </div>
+
+                    {form.password.length > 0 && (
+                      <ul className="mt-2 space-y-0.5">
+                        {passwordChecks.map((check) => (
+                          <li
+                            key={check.label}
+                            className={`flex items-center gap-1.5 text-xs ${check.passed ? "text-emerald-600" : "text-slate-400"
+                              }`}
+                          >
+                            <span>{check.passed ? "✓" : "○"}</span>
+                            {check.label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div>
@@ -401,6 +433,15 @@ export default function ProviderRegister() {
                       placeholder="Re-enter your password"
                       className={inputClass}
                     />
+
+                    {form.confirmPassword.length > 0 && (
+                      <p
+                        className={`mt-1.5 text-xs ${passwordsMatch ? "text-emerald-600" : "text-red-500"
+                          }`}
+                      >
+                        {passwordsMatch ? "✓ Passwords match" : "✗ Passwords do not match"}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -419,8 +460,8 @@ export default function ProviderRegister() {
                   type="submit"
                   disabled={isSubmitting}
                   className={`w-full rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(15,118,110,0)] transition-all duration-200 ${isSubmitting
-                      ? "cursor-not-allowed bg-teal-400 opacity-70"
-                      : "bg-[#0F766E] hover:bg-[#14B8A6] hover:shadow-[0_0_24px_-4px_rgba(15,118,110,0.5)]"
+                    ? "cursor-not-allowed bg-teal-400 opacity-70"
+                    : "bg-[#0F766E] hover:bg-[#14B8A6] hover:shadow-[0_0_24px_-4px_rgba(15,118,110,0.5)]"
                     }`}
                 >
                   {isSubmitting ? (

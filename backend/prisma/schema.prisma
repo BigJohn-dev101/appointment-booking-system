@@ -13,7 +13,7 @@ model User {
   passwordHash    String
   firstName       String
   lastName        String?
-  phone           String?
+  phone           String?        @unique
   role            UserRole       @default(CUSTOMER)
   termsAcceptedAt DateTime?
   createdAt       DateTime       @default(now())
@@ -49,7 +49,7 @@ model Business {
   category      String?
   staffSize     String?
   email         String?
-  phone         String?
+  phone         String?                @unique
   address       String?
   description   String?
   createdAt     DateTime               @default(now())

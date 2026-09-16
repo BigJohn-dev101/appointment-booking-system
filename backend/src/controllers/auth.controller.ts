@@ -4,6 +4,59 @@ import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RULES: { label: string; test: RegExp }[] = [
+  { label: "at least 8 characters", test: /.{8,}/ },
+  { label: "one uppercase letter", test: /[A-Z]/ },
+  { label: "one lowercase letter", test: /[a-z]/ },
+  { label: "one number", test: /\d/ },
+  { label: "one special character", test: /[^A-Za-z0-9]/ },
+];
+
+function getPasswordComplexityError(password: unknown): string | null {
+  if (typeof password !== "string") {
+    return "Password is required";
+  }
+
+  const failed = PASSWORD_RULES.filter((rule) => !rule.test.test(password));
+
+  if (failed.length === 0) {
+    return null;
+  }
+
+  return `Password must contain ${failed.map((rule) => rule.label).join(", ")}`;
+}
+
+async function isPhoneTaken(phone: string): Promise<boolean> {
+  const [existingUserPhone, existingBusinessPhone] = await Promise.all([
+    prisma.user.findFirst({ where: { phone } }),
+    prisma.business.findFirst({ where: { phone } }),
+  ]);
+
+  return Boolean(existingUserPhone || existingBusinessPhone);
+}
+
+function normalizePhone(rawPhone: string): string | null {
+  // Strip everything except digits and a leading +
+  const trimmed = rawPhone.trim();
+  const digitsAndPlus = trimmed.replace(/(?!^\+)[^\d]/g, "");
+
+  let normalized: string;
+
+  if (digitsAndPlus.startsWith("+27")) {
+    normalized = digitsAndPlus;
+  } else if (digitsAndPlus.startsWith("0")) {
+    normalized = `+27${digitsAndPlus.slice(1)}`;
+  } else if (digitsAndPlus.startsWith("27")) {
+    normalized = `+${digitsAndPlus}`;
+  } else {
+    return null;
+  }
+
+  // A valid SA number is +27 followed by exactly 9 digits
+  const isValid = /^\+27\d{9}$/.test(normalized);
+
+  return isValid ? normalized : null;
+}
 
 
 const USER_ROLE_INCLUDE = {
@@ -83,11 +136,13 @@ export const registerCustomer = async (
       });
     }
 
-    // Check password length
-    if (password.length < 8) {
+    // Check password complexity
+    const passwordError = getPasswordComplexityError(password);
+
+    if (passwordError) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters",
+        message: passwordError,
       });
     }
 
@@ -102,6 +157,22 @@ export const registerCustomer = async (
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
+      });
+    }
+
+    const normalizedUserPhone = phone?.trim() ? normalizePhone(phone) : null;
+
+    if (phone?.trim() && !normalizedUserPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid phone number",
+      });
+    }
+
+    if (normalizedUserPhone && (await isPhoneTaken(normalizedUserPhone))) {
+      return res.status(409).json({
+        success: false,
+        message: "This phone number is already in use",
       });
     }
 
@@ -121,7 +192,7 @@ export const registerCustomer = async (
         passwordHash,
         firstName,
         lastName,
-        phone: phone?.trim() || null,
+        phone: normalizedUserPhone,
         role: "CUSTOMER",
         termsAcceptedAt: new Date(),
       },
@@ -142,6 +213,18 @@ export const registerCustomer = async (
       user,
     });
   } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email or phone number already exists",
+      });
+    }
+
     console.error("Customer registration error:", error);
 
     return res.status(500).json({
@@ -185,7 +268,7 @@ export const login = async (
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Wrong login credentials",
       });
     }
 
@@ -198,7 +281,7 @@ export const login = async (
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Wrong login credentials",
       });
     }
 
@@ -367,11 +450,13 @@ export const registerProvider = async (
       });
     }
 
-    // Check password length
-    if (password.length < 8) {
+    // Check password complexity
+    const passwordError = getPasswordComplexityError(password);
+
+    if (passwordError) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters",
+        message: passwordError,
       });
     }
 
@@ -396,6 +481,22 @@ export const registerProvider = async (
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
+      });
+    }
+
+        const normalizedUserPhone = phone?.trim() ? normalizePhone(phone) : null;
+
+    if (phone?.trim() && !normalizedUserPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid phone number",
+      });
+    }
+
+    if (normalizedUserPhone && (await isPhoneTaken(normalizedUserPhone))) {
+      return res.status(409).json({
+        success: false,
+        message: "This phone number is already in use",
       });
     }
 
@@ -433,7 +534,7 @@ export const registerProvider = async (
           passwordHash,
           firstName,
           lastName,
-          phone: phone?.trim() || null,
+          phone: normalizedUserPhone,
           role: "SOLE_PROVIDER",
           termsAcceptedAt: new Date(),
         },
@@ -515,6 +616,18 @@ export const registerProvider = async (
       },
     });
   } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email or phone number already exists",
+      });
+    }
+
     console.error("Provider registration error:", error);
 
     return res.status(500).json({
@@ -584,11 +697,13 @@ export const registerBusiness = async (
       });
     }
 
-    // Password length
-    if (password.length < 8) {
+    // Check password complexity
+    const passwordError = getPasswordComplexityError(password);
+
+    if (passwordError) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters",
+        message: passwordError,
       });
     }
 
@@ -613,6 +728,22 @@ export const registerBusiness = async (
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
+      });
+    }
+
+        const normalizedPhone = normalizePhone(phone);
+
+    if (!normalizedPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid phone number",
+      });
+    }
+
+    if (await isPhoneTaken(normalizedPhone)) {
+      return res.status(409).json({
+        success: false,
+        message: "This phone number is already in use",
       });
     }
 
@@ -661,7 +792,7 @@ export const registerBusiness = async (
           passwordHash,
           firstName,
           lastName,
-          phone: phone.trim(),
+          phone: normalizedPhone,
           role: "BUSINESS_OWNER",
           termsAcceptedAt: now,
         },
@@ -674,7 +805,7 @@ export const registerBusiness = async (
           category: category.trim(),
           staffSize: staffSize.trim(),
           email: normalizedEmail,
-          phone: phone.trim(),
+          phone: normalizedPhone,
           address: address.trim(),
         },
       });
@@ -738,6 +869,18 @@ export const registerBusiness = async (
       },
     });
   } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email or phone number already exists",
+      });
+    }
+
     console.error("Business registration error:", error);
 
     return res.status(500).json({

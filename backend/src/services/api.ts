@@ -18,27 +18,20 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
 
-  if (response.status === 401) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
-    }
+  const data = await response.json().catch(() => null);
+
+  if (response.status === 401 && path !== "/auth/login") {
     throw new ApiError("Session expired", 401);
   }
-
-  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     throw new ApiError(data?.message ?? "Something went wrong", response.status);

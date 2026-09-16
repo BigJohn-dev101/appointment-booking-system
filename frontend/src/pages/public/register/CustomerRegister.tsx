@@ -16,6 +16,16 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
+function getPasswordChecks(password: string) {
+  return [
+    { label: "At least 8 characters", passed: password.length >= 8 },
+    { label: "One uppercase letter", passed: /[A-Z]/.test(password) },
+    { label: "One lowercase letter", passed: /[a-z]/.test(password) },
+    { label: "One number", passed: /\d/.test(password) },
+    { label: "One special character", passed: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
 export default function CustomerRegister() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,6 +37,8 @@ export default function CustomerRegister() {
     confirmPassword: "",
     agree: false,
   });
+  const passwordChecks = getPasswordChecks(form.password);
+  const passwordsMatch = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
 
   const navigate = useNavigate();
 
@@ -41,8 +53,8 @@ export default function CustomerRegister() {
       return;
     }
 
-    if (form.password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+    if (!passwordChecks.every((check) => check.passed)) {
+      toast.error("Password does not meet all requirements.");
       return;
     }
 
@@ -203,6 +215,21 @@ export default function CustomerRegister() {
                       <EyeIcon open={showPassword} />
                     </button>
                   </div>
+
+                  {form.password.length > 0 && (
+                    <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                      {passwordChecks.map((check) => (
+                        <li
+                          key={check.label}
+                          className={`flex items-center gap-1.5 text-xs ${check.passed ? "text-emerald-600" : "text-slate-400"
+                            }`}
+                        >
+                          <span>{check.passed ? "✓" : "○"}</span>
+                          {check.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div>
@@ -218,6 +245,15 @@ export default function CustomerRegister() {
                     placeholder="Re-enter your password"
                     className={inputClass}
                   />
+
+                  {form.confirmPassword.length > 0 && (
+                    <p
+                      className={`mt-1.5 text-xs ${passwordsMatch ? "text-emerald-600" : "text-red-500"
+                        }`}
+                    >
+                      {passwordsMatch ? "✓ Passwords match" : "✗ Passwords do not match"}
+                    </p>
+                  )}
                 </div>
 
                 <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
