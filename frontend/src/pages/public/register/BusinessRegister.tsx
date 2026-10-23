@@ -141,6 +141,7 @@ export default function BusinessRegister() {
         state: {
           email:
             data.email ?? data.user?.email ?? form.email.trim().toLowerCase(),
+          emailSent: data.emailSent !== false,
         },
       });
     } catch (error) {

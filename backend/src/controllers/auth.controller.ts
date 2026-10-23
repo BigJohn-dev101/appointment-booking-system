@@ -201,13 +201,16 @@ export const registerCustomer = async (
 
     if (existingUser) {
       if (!existingUser.isVerified) {
-        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
-          await sendOtpSafely(existingUser);
+        let emailSent = getCooldownRemainingMs(existingUser.otpExpiresAt) > 0;
+
+        if (!emailSent) {
+          emailSent = await sendOtpSafely(existingUser);
         }
 
         return res.status(200).json({
           success: true,
           requiresVerification: true,
+          emailSent,
           email: existingUser.email,
           message: "This email is already registered but not verified. We've sent a code.",
         });
@@ -238,7 +241,7 @@ export const registerCustomer = async (
     // Split full name
     const nameParts = fullName.trim().split(/\s+/);
 
-    const firstName = nameParts[0];
+    const firstName = nameParts[0] ?? "";
     const lastName = nameParts.slice(1).join(" ") || null;
 
     // Hash password
@@ -266,11 +269,12 @@ export const registerCustomer = async (
       },
     });
 
-    await sendOtpSafely(user);
+    const emailSent = await sendOtpSafely(user);
 
     return res.status(201).json({
       success: true,
       requiresVerification: true,
+      emailSent,
       message: "Customer account created successfully",
       user,
     });
@@ -348,14 +352,17 @@ export const login = async (
     }
 
     if (!user.isVerified && SELF_REGISTERED_ROLES.includes(user.role)) {
-      if (getCooldownRemainingMs(user.otpExpiresAt) === 0) {
-        await sendOtpSafely(user);
+      let emailSent = getCooldownRemainingMs(user.otpExpiresAt) > 0;
+
+      if (!emailSent) {
+        emailSent = await sendOtpSafely(user);
       }
 
       return res.status(403).json({
         success: false,
         code: "EMAIL_NOT_VERIFIED",
         email: user.email,
+        emailSent,
         message: "Please verify your email to continue",
       });
     }
@@ -490,6 +497,10 @@ export const registerProvider = async (
       !fullName ||
       !serviceName ||
       !email ||
+      !phone ||
+      !city ||
+      !category ||
+      !experience ||
       !password ||
       !confirmPassword ||
       !packageTier
@@ -501,10 +512,77 @@ export const registerProvider = async (
       });
     }
 
-    if (!EMAIL_REGEX.test(email.trim())) {
+    if (
+      typeof fullName !== "string" ||
+      !/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(fullName.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid full name",
+      });
+    }
+
+    if (
+      typeof serviceName !== "string" ||
+      !serviceName.trim() ||
+      serviceName.trim().length > 100 ||
+      EMAIL_REGEX.test(serviceName.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid service name",
+      });
+    }
+
+    if (typeof email !== "string" || !EMAIL_REGEX.test(email.trim())) {
       return res.status(400).json({
         success: false,
         message: "Please enter a valid email address",
+      });
+    }
+
+    if (typeof phone !== "string" || !phone.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid phone number",
+      });
+    }
+
+    if (
+      typeof city !== "string" ||
+      !/^[\p{L}\p{M}][\p{L}\p{M} .,'-]{1,99}$/u.test(city.trim()) ||
+      EMAIL_REGEX.test(city.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid city or service area",
+      });
+    }
+
+    if (
+      typeof category !== "string" ||
+      !["Hair & Beauty", "Health & Wellness", "Fitness & Coaching", "Home Services", "Tutoring & Lessons", "Other"].includes(category)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid service category",
+      });
+    }
+
+    if (
+      typeof experience !== "string" ||
+      !["Just starting out", "1–3 years", "4–9 years", "10+ years"].includes(experience)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid experience level",
+      });
+    }
+
+    if (bio !== undefined && (typeof bio !== "string" || bio.trim().length > 500)) {
+      return res.status(400).json({
+        success: false,
+        message: "Your bio must be 500 characters or fewer",
       });
     }
 
@@ -555,13 +633,16 @@ export const registerProvider = async (
     if (existingUser) {
       // Unverified account: send them to the OTP step instead of a dead end
       if (!existingUser.isVerified) {
-        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
-          await sendOtpSafely(existingUser);
+        let emailSent = getCooldownRemainingMs(existingUser.otpExpiresAt) > 0;
+
+        if (!emailSent) {
+          emailSent = await sendOtpSafely(existingUser);
         }
 
         return res.status(200).json({
           success: true,
           requiresVerification: true,
+          emailSent,
           email: existingUser.email,
           message: "This email is already registered but not verified. We've sent a code.",
         });
@@ -609,7 +690,7 @@ export const registerProvider = async (
     // Split full name
     const nameParts = fullName.trim().split(/\s+/);
 
-    const firstName = nameParts[0];
+    const firstName = nameParts[0] ?? "";
     const lastName = nameParts.slice(1).join(" ") || null;
 
     // Hash password
@@ -671,11 +752,12 @@ export const registerProvider = async (
       };
     });
 
-    await sendOtpSafely(result.user);
+    const emailSent = await sendOtpSafely(result.user);
 
     return res.status(201).json({
       success: true,
       requiresVerification: true,
+      emailSent,
       message: "Provider account created successfully",
       user: {
         id: result.user.id,
@@ -818,13 +900,16 @@ export const registerBusiness = async (
 
     if (existingUser) {
       if (!existingUser.isVerified) {
-        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
-          await sendOtpSafely(existingUser);
+        let emailSent = getCooldownRemainingMs(existingUser.otpExpiresAt) > 0;
+
+        if (!emailSent) {
+          emailSent = await sendOtpSafely(existingUser);
         }
 
         return res.status(200).json({
           success: true,
           requiresVerification: true,
+          emailSent,
           email: existingUser.email,
           message: "This email is already registered but not verified. We've sent a code.",
         });
@@ -939,11 +1024,12 @@ export const registerBusiness = async (
       };
     });
 
-    await sendOtpSafely(result.user);
+    const emailSent = await sendOtpSafely(result.user);
 
     return res.status(201).json({
       success: true,
       requiresVerification: true,
+      emailSent,
       message: "Business account created successfully",
       user: {
         id: result.user.id,

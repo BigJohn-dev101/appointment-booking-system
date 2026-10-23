@@ -11,12 +11,18 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { verifyEmail } = useAuth();
-  const email = (location.state as { email?: string } | null)?.email ?? "";
+  const verificationState = location.state as
+    | { email?: string; emailSent?: boolean }
+    | null;
+  const email = verificationState?.email ?? "";
+  const emailSent = verificationState?.emailSent !== false;
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(RESEND_COOLDOWN_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(
+    emailSent ? RESEND_COOLDOWN_SECONDS : 0,
+  );
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -98,8 +104,9 @@ export default function VerifyEmail() {
               Verify your email
             </h1>
             <p className="mx-auto mt-2 max-w-[300px] text-center text-sm leading-6 text-slate-500">
-              We sent a 6-digit code to <span className="font-semibold text-[#0F172A]">{email}</span>.
-              It expires in 10 minutes.
+              {emailSent ? "We sent a 6-digit code to " : "We couldn't send a code to "}
+              <span className="font-semibold text-[#0F172A]">{email}</span>
+              {emailSent ? ". It expires in 10 minutes." : ". You can retry below."}
             </p>
           </div>
 
