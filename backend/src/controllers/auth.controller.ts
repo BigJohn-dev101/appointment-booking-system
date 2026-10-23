@@ -2,6 +2,13 @@ import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
+import {
+  issueOtp,
+  issuePasswordResetOtp,
+  otpMatches,
+  getCooldownRemainingMs,
+  OTP_MAX_ATTEMPTS,
+} from "../services/otp.service.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_RULES: { label: string; test: RegExp }[] = [
@@ -78,9 +85,17 @@ type UserWithRoleData = Awaited<
   >
 >;
 
-
 function serializeUser(user: NonNullable<UserWithRoleData>) {
-  const { passwordHash: _passwordHash, ...safeUser } = user;
+  const {
+    passwordHash: _passwordHash,
+    otpCode: _otpCode,
+    otpExpiresAt: _otpExpiresAt,
+    otpAttempts: _otpAttempts,
+    passwordResetCode: _passwordResetCode,
+    passwordResetExpiresAt: _passwordResetExpiresAt,
+    passwordResetAttempts: _passwordResetAttempts,
+    ...safeUser
+  } = user;
 
   return {
     ...safeUser,
@@ -89,6 +104,37 @@ function serializeUser(user: NonNullable<UserWithRoleData>) {
     businessStaff:
       user.role === "BUSINESS_STAFF" ? user.businessStaff : null,
   };
+}
+
+const SELF_REGISTERED_ROLES = ["CUSTOMER", "SOLE_PROVIDER", "BUSINESS_OWNER"];
+
+async function sendOtpSafely(user: {
+  id: string;
+  email: string;
+  firstName: string;
+}): Promise<boolean> {
+  try {
+    await issueOtp(user);
+    return true;
+  } catch (error) {
+    console.error("Failed to send verification email:", error);
+    return false;
+  }
+}
+
+function setSessionCookie(res: Response, user: { id: string; role: string }) {
+  const token = jwt.sign(
+    { userId: user.id, role: user.role },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "1d" },
+  );
+
+  res.cookie("session", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000,
+  });
 }
 
 export const registerCustomer = async (
@@ -154,6 +200,19 @@ export const registerCustomer = async (
     });
 
     if (existingUser) {
+      if (!existingUser.isVerified) {
+        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
+          await sendOtpSafely(existingUser);
+        }
+
+        return res.status(200).json({
+          success: true,
+          requiresVerification: true,
+          email: existingUser.email,
+          message: "This email is already registered but not verified. We've sent a code.",
+        });
+      }
+
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
@@ -207,8 +266,11 @@ export const registerCustomer = async (
       },
     });
 
+    await sendOtpSafely(user);
+
     return res.status(201).json({
       success: true,
+      requiresVerification: true,
       message: "Customer account created successfully",
       user,
     });
@@ -282,6 +344,19 @@ export const login = async (
       return res.status(401).json({
         success: false,
         message: "Wrong login credentials",
+      });
+    }
+
+    if (!user.isVerified && SELF_REGISTERED_ROLES.includes(user.role)) {
+      if (getCooldownRemainingMs(user.otpExpiresAt) === 0) {
+        await sendOtpSafely(user);
+      }
+
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        email: user.email,
+        message: "Please verify your email to continue",
       });
     }
 
@@ -478,13 +553,27 @@ export const registerProvider = async (
     });
 
     if (existingUser) {
+      // Unverified account: send them to the OTP step instead of a dead end
+      if (!existingUser.isVerified) {
+        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
+          await sendOtpSafely(existingUser);
+        }
+
+        return res.status(200).json({
+          success: true,
+          requiresVerification: true,
+          email: existingUser.email,
+          message: "This email is already registered but not verified. We've sent a code.",
+        });
+      }
+
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
       });
     }
 
-        const normalizedUserPhone = phone?.trim() ? normalizePhone(phone) : null;
+    const normalizedUserPhone = phone?.trim() ? normalizePhone(phone) : null;
 
     if (phone?.trim() && !normalizedUserPhone) {
       return res.status(400).json({
@@ -582,8 +671,11 @@ export const registerProvider = async (
       };
     });
 
+    await sendOtpSafely(result.user);
+
     return res.status(201).json({
       success: true,
+      requiresVerification: true,
       message: "Provider account created successfully",
       user: {
         id: result.user.id,
@@ -725,13 +817,26 @@ export const registerBusiness = async (
     });
 
     if (existingUser) {
+      if (!existingUser.isVerified) {
+        if (getCooldownRemainingMs(existingUser.otpExpiresAt) === 0) {
+          await sendOtpSafely(existingUser);
+        }
+
+        return res.status(200).json({
+          success: true,
+          requiresVerification: true,
+          email: existingUser.email,
+          message: "This email is already registered but not verified. We've sent a code.",
+        });
+      }
+
       return res.status(409).json({
         success: false,
         message: "An account with this email already exists",
       });
     }
 
-        const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = normalizePhone(phone);
 
     if (!normalizedPhone) {
       return res.status(400).json({
@@ -834,8 +939,11 @@ export const registerBusiness = async (
       };
     });
 
+    await sendOtpSafely(result.user);
+
     return res.status(201).json({
       success: true,
+      requiresVerification: true,
       message: "Business account created successfully",
       user: {
         id: result.user.id,
@@ -886,6 +994,282 @@ export const registerBusiness = async (
     return res.status(500).json({
       success: false,
       message: "Something went wrong while creating the business account",
+    });
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and code are required",
+      });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not configured");
+
+      return res.status(500).json({
+        success: false,
+        message: "Server authentication configuration error",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+      include: USER_ROLE_INCLUDE,
+    });
+
+    const invalid = () =>
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired code",
+      });
+
+    if (!user) return invalid();
+
+    if (user.isVerified) {
+      return res.status(409).json({
+        success: false,
+        message: "This email is already verified. Please log in.",
+      });
+    }
+
+    if (!user.otpCode || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      return invalid();
+    }
+
+    if (user.otpAttempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new code.",
+      });
+    }
+
+    if (!otpMatches(String(code).trim(), user.otpCode)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { otpAttempts: { increment: 1 } },
+      });
+
+      return invalid();
+    }
+
+    const verifiedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+      },
+      include: USER_ROLE_INCLUDE,
+    });
+
+    // Log them straight in after verifying
+    setSessionCookie(res, verifiedUser);
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      user: serializeUser(verifiedUser),
+    });
+  } catch (error) {
+    console.error("Verify OTP error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while verifying your email",
+    });
+  }
+};
+
+export const resendOtp = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    // Same response whether or not the account exists
+    if (!user || user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        message: "If this account needs verification, a new code has been sent",
+      });
+    }
+
+    const remainingMs = getCooldownRemainingMs(user.otpExpiresAt);
+
+    if (remainingMs > 0) {
+      const retryAfterSeconds = Math.ceil(remainingMs / 1000);
+
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${retryAfterSeconds}s before requesting another code`,
+        retryAfterSeconds,
+      });
+    }
+
+    const sent = await sendOtpSafely(user);
+
+    if (!sent) {
+      return res.status(500).json({
+        success: false,
+        message: "We couldn't send the email. Please try again shortly.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "A new code has been sent",
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while sending the code",
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    if (user && getCooldownRemainingMs(user.passwordResetExpiresAt) === 0) {
+      try {
+        await issuePasswordResetOtp(user);
+      } catch (error) {
+        console.error("Failed to send password reset email:", error);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account exists for this email, we've sent a reset code",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while processing your request",
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, code, password, confirmPassword } = req.body;
+
+    if (!email || !code || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, code and new password are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    const passwordError = getPasswordComplexityError(password);
+
+    if (passwordError) {
+      return res.status(400).json({
+        success: false,
+        message: passwordError,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    const invalid = () =>
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired code",
+      });
+
+    if (
+      !user ||
+      !user.passwordResetCode ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
+      return invalid();
+    }
+
+    if (user.passwordResetAttempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new code.",
+      });
+    }
+
+    if (!otpMatches(String(code).trim(), user.passwordResetCode)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetAttempts: { increment: 1 } },
+      });
+
+      return invalid();
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetCode: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+        isVerified: true,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now sign in.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while resetting your password",
     });
   }
 };

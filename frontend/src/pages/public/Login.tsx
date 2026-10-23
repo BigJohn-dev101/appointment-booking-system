@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../hooks/useAuth";
+import { getVerificationEmail } from "../../services/auth";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -47,6 +48,16 @@ export default function Login() {
           toast.error("Your account has an unsupported role.");
       }
     } catch (error) {
+      const unverifiedEmail = getVerificationEmail(error);
+
+      if (unverifiedEmail) {
+        toast("Please verify your email to continue. We've sent you a code.");
+        navigate("/verify-email", {
+          state: { email: unverifiedEmail },
+        });
+        return;
+      }
+
       console.error("Login request failed:", error);
       toast.error(
         error instanceof Error ? error.message : "Unable to connect to the server.",
@@ -143,15 +154,12 @@ export default function Login() {
                       Password
                     </label>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toast("Password recovery will be available soon.")
-                      }
+                    <Link
+                      to="/forgot-password"
                       className="text-xs font-semibold text-[#0EA5E9] transition-colors hover:text-sky-700"
                     >
                       Forgot password?
-                    </button>
+                    </Link>
                   </div>
 
                   <div className="relative mt-1.5">

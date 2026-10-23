@@ -10,6 +10,9 @@ import Pricing from "../pages/public/Pricing";
 import Login from "../pages/public/Login";
 import About from "../pages/public/About";
 import Contact from "../pages/public/Contact";
+import VerifyEmail from "../pages/public/VerifyEmail";
+import ForgotPassword from "../pages/public/ForgotPassword.tsx";
+import ResetPassword from "../pages/public/ResetPassword.tsx";
 
 // Provider discovery
 import Providers from "../pages/public/providers/Providers";
@@ -35,6 +38,9 @@ export default function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
 

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { apiFetch } from "../services/api";
+import { verifyEmailOtp } from "../services/auth";
 
 export type AuthUser = {
   id: string;
@@ -26,6 +27,7 @@ type AuthContextValue = {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
+  verifyEmail: (email: string, code: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -58,6 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.user;
   }, []);
 
+  const verifyEmail = useCallback(async (email: string, code: string) => {
+    const response = await verifyEmailOtp(email, code);
+
+    setUser(response.user);
+    setLoading(false);
+    return response.user;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await fetch("http://localhost:5000/api/auth/logout", {
@@ -83,10 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isAuthenticated: Boolean(user),
       login,
+      verifyEmail,
       logout,
       refreshUser,
     }),
-    [user, loading, login, logout, refreshUser],
+    [user, loading, login, verifyEmail, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

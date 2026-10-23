@@ -135,9 +135,14 @@ export default function BusinessRegister() {
         return;
       }
 
-      toast.success("Business account created successfully");
-
-      navigate("/login");
+      toast.success("Check your email for a verification code.");
+      navigate("/verify-email", {
+        replace: true,
+        state: {
+          email:
+            data.email ?? data.user?.email ?? form.email.trim().toLowerCase(),
+        },
+      });
     } catch (error) {
       console.error("Business registration error:", error);
 
