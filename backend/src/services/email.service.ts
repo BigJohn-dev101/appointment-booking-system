@@ -8,10 +8,11 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export async function sendVerificationEmail(
+async function sendEmail(
   to: string,
-  firstName: string,
-  code: string,
+  subject: string,
+  text: string,
+  html: string,
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
@@ -26,17 +27,48 @@ export async function sendVerificationEmail(
   const { error } = await resend.emails.send({
     from,
     to,
-    subject: "Your verification code",
-    text: `Hi ${firstName}, your verification code is ${code}. It expires in 10 minutes.`,
-    html: `
-      <p>Hi ${escapeHtml(firstName)},</p>
-      <p>Your verification code is:</p>
-      <p style="font-size:28px;font-weight:bold;letter-spacing:6px;">${code}</p>
-      <p>It expires in 10 minutes. If you didn't create an account, you can ignore this email.</p>
-    `,
+    subject,
+    text,
+    html,
   });
 
   if (error) {
     throw new Error(`Resend error: ${error.message}`);
   }
+}
+
+export async function sendVerificationEmail(
+  to: string,
+  firstName: string,
+  code: string,
+): Promise<void> {
+  await sendEmail(
+    to,
+    "Your verification code",
+    `Hi ${firstName}, your verification code is ${code}. It expires in 10 minutes.`,
+    `
+      <p>Hi ${escapeHtml(firstName)},</p>
+      <p>Your verification code is:</p>
+      <p style="font-size:28px;font-weight:bold;letter-spacing:6px;">${code}</p>
+      <p>It expires in 10 minutes. If you didn't create an account, you can ignore this email.</p>
+    `,
+  );
+}
+
+export async function sendPasswordResetEmail(
+  to: string,
+  firstName: string,
+  code: string,
+): Promise<void> {
+  await sendEmail(
+    to,
+    "Your password reset code",
+    `Hi ${firstName}, your password reset code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`,
+    `
+      <p>Hi ${escapeHtml(firstName)},</p>
+      <p>Use this code to reset your password:</p>
+      <p style="font-size:28px;font-weight:bold;letter-spacing:6px;">${code}</p>
+      <p>It expires in 10 minutes. If you didn't request a password reset, you can safely ignore this email. Your password won't change.</p>
+    `,
+  );
 }

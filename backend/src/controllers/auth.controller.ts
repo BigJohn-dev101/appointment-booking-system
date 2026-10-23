@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
 import {
   issueOtp,
+  issuePasswordResetOtp,
   otpMatches,
   getCooldownRemainingMs,
   OTP_MAX_ATTEMPTS,
@@ -90,6 +91,9 @@ function serializeUser(user: NonNullable<UserWithRoleData>) {
     otpCode: _otpCode,
     otpExpiresAt: _otpExpiresAt,
     otpAttempts: _otpAttempts,
+    passwordResetCode: _passwordResetCode,
+    passwordResetExpiresAt: _passwordResetExpiresAt,
+    passwordResetAttempts: _passwordResetAttempts,
     ...safeUser
   } = user;
 
@@ -1137,6 +1141,135 @@ export const resendOtp = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Something went wrong while sending the code",
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    if (user && getCooldownRemainingMs(user.passwordResetExpiresAt) === 0) {
+      try {
+        await issuePasswordResetOtp(user);
+      } catch (error) {
+        console.error("Failed to send password reset email:", error);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account exists for this email, we've sent a reset code",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while processing your request",
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, code, password, confirmPassword } = req.body;
+
+    if (!email || !code || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, code and new password are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    const passwordError = getPasswordComplexityError(password);
+
+    if (passwordError) {
+      return res.status(400).json({
+        success: false,
+        message: passwordError,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    const invalid = () =>
+      res.status(400).json({
+        success: false,
+        message: "Invalid or expired code",
+      });
+
+    if (
+      !user ||
+      !user.passwordResetCode ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
+      return invalid();
+    }
+
+    if (user.passwordResetAttempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new code.",
+      });
+    }
+
+    if (!otpMatches(String(code).trim(), user.passwordResetCode)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetAttempts: { increment: 1 } },
+      });
+
+      return invalid();
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetCode: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+        isVerified: true,
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now sign in.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while resetting your password",
     });
   }
 };

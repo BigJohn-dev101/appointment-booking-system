@@ -24,3 +24,28 @@ export function getVerificationEmail(error: unknown): string | null {
 
 	return data?.code === "EMAIL_NOT_VERIFIED" && data.email ? data.email : null;
 }
+
+export function requestPasswordReset(email: string) {
+	return apiFetch<{ success: boolean; message: string }>(
+		"/auth/forgot-password",
+		{
+			method: "POST",
+			body: JSON.stringify({ email }),
+		},
+	);
+}
+
+export function resetPasswordWithOtp(payload: {
+	email: string;
+	code: string;
+	password: string;
+	confirmPassword: string;
+}) {
+	return apiFetch<{ success: boolean; message: string }>(
+		"/auth/reset-password",
+		{
+			method: "POST",
+			body: JSON.stringify(payload),
+		},
+	);
+}

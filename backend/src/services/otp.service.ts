@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import prisma from "../lib/prisma.js";
-import { sendVerificationEmail } from "./email.service.js";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} from "./email.service.js";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -49,4 +52,23 @@ export async function issueOtp(user: {
   });
 
   await sendVerificationEmail(user.email, user.firstName, code);
+}
+
+export async function issuePasswordResetOtp(user: {
+  id: string;
+  email: string;
+  firstName: string;
+}): Promise<void> {
+  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetCode: hashOtp(code),
+      passwordResetExpiresAt: new Date(Date.now() + OTP_TTL_MS),
+      passwordResetAttempts: 0,
+    },
+  });
+
+  await sendPasswordResetEmail(user.email, user.firstName, code);
 }
