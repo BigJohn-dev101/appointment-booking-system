@@ -6,6 +6,8 @@ import {
   login,
   logout,
   getMe,
+  verifyOtp,
+  resendOtp,
 } from "../controllers/auth.controller.js";
 import {
   authenticate,
@@ -20,6 +22,8 @@ router.post("/register/business", registerBusiness);
 
 router.post("/login", login);
 router.post("/logout", logout);
+router.post("/verify-otp", verifyOtp);
+router.post("/resend-otp", resendOtp);
 
 router.get("/me", authenticate, getMe);
 

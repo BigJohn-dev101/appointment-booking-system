@@ -131,13 +131,14 @@ export default function ProviderRegister() {
         return;
       }
 
-      console.log("Provider registered:", data);
-
-      toast.success("Provider account created successfully!");
-
-      setTimeout(() => {
-        navigate("/login");
-      }, 1000);
+      toast.success("Check your email for a verification code.");
+      navigate("/verify-email", {
+        replace: true,
+        state: {
+          email:
+            data.email ?? data.user?.email ?? form.email.trim().toLowerCase(),
+        },
+      });
     } catch (error) {
       console.error("Provider registration request failed:", error);
 

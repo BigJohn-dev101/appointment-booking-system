@@ -84,8 +84,14 @@ export default function CustomerRegister() {
         return;
       }
 
-      toast.success("Customer account created successfully!");
-      navigate("/login", { replace: true });
+      toast.success("Check your email for a verification code.");
+      navigate("/verify-email", {
+        replace: true,
+        state: {
+          email:
+            data.email ?? data.user?.email ?? form.email.trim().toLowerCase(),
+        },
+      });
     } catch (error) {
       console.error("Registration request failed:", error);
       toast.error("Unable to connect to the server.");

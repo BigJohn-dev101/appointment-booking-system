@@ -2,10 +2,16 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api"
 
 export class ApiError extends Error {
   status: number;
+  data: { code?: string; email?: string } | null;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    data: { code?: string; email?: string } | null = null,
+  ) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -25,11 +31,15 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const data = await response.json().catch(() => null);
 
   if (response.status === 401 && path !== "/auth/login") {
-    throw new ApiError("Session expired", 401);
+    throw new ApiError("Session expired", 401, data);
   }
 
   if (!response.ok) {
-    throw new ApiError(data?.message ?? "Something went wrong", response.status);
+    throw new ApiError(
+      data?.message ?? "Something went wrong",
+      response.status,
+      data,
+    );
   }
 
   return data as T;
