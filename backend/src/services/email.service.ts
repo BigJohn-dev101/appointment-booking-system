@@ -22,11 +22,16 @@ async function sendEmail(
     throw new Error("Email is not configured");
   }
 
+  const recipient =
+    process.env.NODE_ENV === "production"
+      ? to
+      : process.env.OTP_TEST_RECIPIENT?.trim() || to;
+
   const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({
     from,
-    to,
+    to: recipient,
     subject,
     text,
     html,

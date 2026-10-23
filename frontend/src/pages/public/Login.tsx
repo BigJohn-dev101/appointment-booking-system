@@ -51,9 +51,16 @@ export default function Login() {
       const unverifiedEmail = getVerificationEmail(error);
 
       if (unverifiedEmail) {
-        toast("Please verify your email to continue. We've sent you a code.");
+        const emailSent =
+          (error as { data?: { emailSent?: boolean } } | null)?.data?.emailSent !== false;
+
+        toast(
+          emailSent
+            ? "Please verify your email to continue. We've sent you a code."
+            : "We couldn't send your code. You can retry from the verification page.",
+        );
         navigate("/verify-email", {
-          state: { email: unverifiedEmail },
+          state: { email: unverifiedEmail, emailSent },
         });
         return;
       }

@@ -110,6 +110,31 @@ export default function ProviderRegister() {
       return;
     }
 
+    if (!/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(form.fullName.trim())) {
+      toast.error("Enter a valid full name.");
+      return;
+    }
+
+    if (!form.serviceName.trim() || form.serviceName.trim().length > 100) {
+      toast.error("Enter a service name of 1 to 100 characters.");
+      return;
+    }
+
+    if (!/^[\p{L}\p{M}][\p{L}\p{M} .,'-]{1,99}$/u.test(form.city.trim())) {
+      toast.error("Enter a valid city or service area, not an email address.");
+      return;
+    }
+
+    if (!form.experience) {
+      toast.error("Please select your years of experience.");
+      return;
+    }
+
+    if (form.bio.trim().length > 500) {
+      toast.error("Your bio must be 500 characters or fewer.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -137,6 +162,7 @@ export default function ProviderRegister() {
         state: {
           email:
             data.email ?? data.user?.email ?? form.email.trim().toLowerCase(),
+          emailSent: data.emailSent !== false,
         },
       });
     } catch (error) {
@@ -206,8 +232,11 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="fullName"
+                      name="fullName"
                       type="text"
                       required
+                      autoComplete="name"
+                      maxLength={100}
                       value={form.fullName}
                       onChange={(e) => update("fullName", e.target.value)}
                       placeholder="Full Names"
@@ -220,8 +249,11 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="serviceName"
+                      name="serviceName"
                       type="text"
                       required
+                      autoComplete="organization"
+                      maxLength={100}
                       value={form.serviceName}
                       onChange={(e) => update("serviceName", e.target.value)}
                       placeholder="Business Name"
@@ -237,8 +269,10 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="email"
+                      name="email"
                       type="email"
                       required
+                      autoComplete="email"
                       value={form.email}
                       onChange={(e) => update("email", e.target.value)}
                       placeholder="businessname@example.com"
@@ -251,8 +285,11 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="phone"
+                      name="phone"
                       type="tel"
                       required
+                      autoComplete="tel"
+                      maxLength={20}
                       value={form.phone}
                       onChange={(e) => update("phone", e.target.value)}
                       placeholder="+27 82 000 0000"
@@ -292,8 +329,11 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="city"
+                      name="city"
                       type="text"
                       required
+                      autoComplete="address-level2"
+                      maxLength={100}
                       value={form.city}
                       onChange={(e) => update("city", e.target.value)}
                       placeholder="Pretoria, Gauteng"
@@ -306,6 +346,7 @@ export default function ProviderRegister() {
                     </label>
                     <select
                       id="experience"
+                      name="experience"
                       required
                       value={form.experience}
                       onChange={(e) => update("experience", e.target.value)}
@@ -329,7 +370,9 @@ export default function ProviderRegister() {
                   </label>
                   <textarea
                     id="bio"
+                    name="bio"
                     rows={2}
+                    maxLength={500}
                     value={form.bio}
                     onChange={(e) => update("bio", e.target.value)}
                     placeholder="A short line about your services and specialties."
@@ -387,9 +430,11 @@ export default function ProviderRegister() {
                     <div className="relative mt-1.5">
                       <input
                         id="password"
+                        name="new-password"
                         type={showPassword ? "text" : "password"}
                         required
                         minLength={8}
+                        autoComplete="new-password"
                         value={form.password}
                         onChange={(e) => update("password", e.target.value)}
                         placeholder="At least 8 characters"
@@ -427,8 +472,10 @@ export default function ProviderRegister() {
                     </label>
                     <input
                       id="confirmPassword"
+                      name="confirmPassword"
                       type={showPassword ? "text" : "password"}
                       required
+                      autoComplete="new-password"
                       value={form.confirmPassword}
                       onChange={(e) => update("confirmPassword", e.target.value)}
                       placeholder="Re-enter your password"

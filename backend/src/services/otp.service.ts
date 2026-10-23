@@ -41,17 +41,31 @@ export async function issueOtp(user: {
   firstName: string;
 }): Promise<void> {
   const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const otpCode = hashOtp(code);
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      otpCode: hashOtp(code),
+      otpCode,
       otpExpiresAt: new Date(Date.now() + OTP_TTL_MS),
       otpAttempts: 0,
     },
   });
 
-  await sendVerificationEmail(user.email, user.firstName, code);
+  try {
+    await sendVerificationEmail(user.email, user.firstName, code);
+  } catch (error) {
+    await prisma.user.updateMany({
+      where: { id: user.id, otpCode },
+      data: {
+        otpCode: null,
+        otpExpiresAt: null,
+        otpAttempts: 0,
+      },
+    });
+
+    throw error;
+  }
 }
 
 export async function issuePasswordResetOtp(user: {
@@ -60,15 +74,29 @@ export async function issuePasswordResetOtp(user: {
   firstName: string;
 }): Promise<void> {
   const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const passwordResetCode = hashOtp(code);
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      passwordResetCode: hashOtp(code),
+      passwordResetCode,
       passwordResetExpiresAt: new Date(Date.now() + OTP_TTL_MS),
       passwordResetAttempts: 0,
     },
   });
 
-  await sendPasswordResetEmail(user.email, user.firstName, code);
+  try {
+    await sendPasswordResetEmail(user.email, user.firstName, code);
+  } catch (error) {
+    await prisma.user.updateMany({
+      where: { id: user.id, passwordResetCode },
+      data: {
+        passwordResetCode: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+      },
+    });
+
+    throw error;
+  }
 }
