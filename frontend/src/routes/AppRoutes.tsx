@@ -28,6 +28,7 @@ import BusinessRegister from "../pages/public/register/BusinessRegister";
 import ClientDashboard from "../pages/dashboard/customer/Dashboard";
 import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
 import BusinessDashboard from "../pages/dashboard/business/Dashboard";
+import AdminDashboard from "../pages/dashboard/admin/Dashboard";
 
 export default function AppRoutes() {
   return (
@@ -82,6 +83,16 @@ export default function AppRoutes() {
           <ProtectedRoute>
             <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
               <BusinessDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/admin"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["ADMIN"]}>
+              <AdminDashboard />
             </RoleRoute>
           </ProtectedRoute>
         }
