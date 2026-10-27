@@ -12,7 +12,16 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+      const isLocalDevelopmentOrigin =
+        process.env.NODE_ENV !== "production" &&
+        /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin ?? "");
+
+      callback(
+        null,
+        !origin || origin === FRONTEND_ORIGIN || isLocalDevelopmentOrigin,
+      );
+    },
     credentials: true,
   }),
 );
