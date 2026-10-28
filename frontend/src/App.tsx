@@ -1,4 +1,5 @@
 import AppRoutes from "./routes/AppRoutes";
+import Services from "./pages/dashboard/provider/Services";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 
