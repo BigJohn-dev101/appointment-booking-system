@@ -18,6 +18,14 @@ import ResetPassword from "../pages/public/ResetPassword.tsx";
 import Providers from "../pages/public/providers/Providers";
 import ProviderProfile from "../pages/public/providers/ProviderProfile";
 
+// Service provider pages
+import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
+import Services from "../pages/dashboard/provider/Services";
+import Appointments from "../pages/dashboard/provider/Appointments";
+import Availability from "../pages/dashboard/provider/Availability";
+import ProviderProfilePage from "../pages/dashboard/provider/Profile";
+import ProviderPackage from "../pages/dashboard/provider/Package";
+
 // Registration
 import Register from "../pages/public/register/Register";
 import CustomerRegister from "../pages/public/register/CustomerRegister";
@@ -26,15 +34,14 @@ import BusinessRegister from "../pages/public/register/BusinessRegister";
 
 // Customer dashboard
 import ClientDashboard from "../pages/dashboard/customer/Dashboard";
-import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
 import BusinessDashboard from "../pages/dashboard/business/Dashboard";
+import ProviderLayout from "../layouts/ProviderLayout.tsx";
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* --- PUBLIC ROUTES --- */}
       <Route element={<PublicLayout />}>
-        {/* Main public pages */}
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
@@ -43,19 +50,41 @@ export default function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-
-        {/* Provider discovery */}
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderProfile />} />
-
-        {/* Registration */}
         <Route path="/register" element={<Register />} />
         <Route path="/register/customer" element={<CustomerRegister />} />
         <Route path="/register/provider" element={<ProviderRegister />} />
         <Route path="/register/business" element={<BusinessRegister />} />
       </Route>
 
-      {/* Protected dashboards */}
+      {/* --- PROTECTED PROVIDER DASHBOARD ROUTES --- */}
+      {/* 
+        We wrap the entire provider section in the ProtectedRoute and RoleRoute.
+        Then we use ProviderLayout to render the sidebar.
+      */}
+      <Route
+        path="/dashboard/provider"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["SOLE_PROVIDER"]}>
+              <ProviderLayout />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      >
+        {/* Index route for /dashboard/provider (the main Dashboard) */}
+        <Route index element={<ProviderDashboard />} />
+        
+        {/* Sub-routes for the provider dashboard */}
+        <Route path="services" element={<Services />} />
+        <Route path="appointments" element={<Appointments />} />
+        <Route path="availability" element={<Availability />} />
+        <Route path="profile" element={<ProviderProfilePage />} />
+        <Route path="subscription" element={<ProviderPackage />} />
+      </Route>
+
+      {/* --- PROTECTED CUSTOMER DASHBOARD --- */}
       <Route
         path="/dashboard/customer"
         element={
@@ -66,16 +95,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/dashboard/provider"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["SOLE_PROVIDER"]}>
-              <ProviderDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
+
+      {/* --- PROTECTED BUSINESS DASHBOARD --- */}
       <Route
         path="/dashboard/business"
         element={
