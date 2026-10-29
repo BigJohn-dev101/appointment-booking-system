@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../../services/api";
 
@@ -8,184 +8,179 @@ const ACCENT_TO = "#38BDF8";
 type Service = {
   id: string;
   name: string;
-  description?: string;
-  duration: number; // in minutes
-  price: number;
+  description: string | null;
+  durationMinutes: number;
+  expectedPrice: number | string | null;
+  active: boolean;
 };
+
+type ServicesResponse = { success: boolean; services: Service[] };
+type ServiceForm = { name: string; description: string; durationMinutes: number; expectedPrice: string };
+const EMPTY_FORM: ServiceForm = { name: "", description: "", durationMinutes: 30, expectedPrice: "" };
 
 export default function Services() {
   const [services, setServices] = useState<Service[]>([]);
+  const [formData, setFormData] = useState<ServiceForm>(EMPTY_FORM);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Form State
-  const [formData, setFormData] = useState({ name: "", description: "", duration: 30, price: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch Services
-  const fetchServices = async () => {
-    try {
-      const data = await apiFetch<Service[]>("/provider/services");
-      setServices(data);
-    } catch (error) {
-      console.error("Provider services fetch failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to load services");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    let isMounted = true;
-
-    void apiFetch<Service[]>("/provider/services")
-      .then((data) => {
-        if (isMounted) setServices(data);
+    let active = true;
+    void apiFetch<ServicesResponse>("/provider/services")
+      .then((response) => {
+        if (active) {
+          setServices(response.services ?? []);
+          setLoadError(null);
+        }
       })
       .catch((error: unknown) => {
         console.error("Provider services fetch failed:", error);
-        if (isMounted) {
-          toast.error(error instanceof Error ? error.message : "Failed to load services");
-        }
+        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load services.");
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        if (active) setIsLoading(false);
       });
+    return () => { active = false; };
+  }, [reloadKey]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Handle Form Submit
-  const handleAddService = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddService = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setIsSubmitting(true);
     try {
       await apiFetch("/provider/services", {
         method: "POST",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description || null,
+          durationMinutes: formData.durationMinutes,
+          expectedPrice: formData.expectedPrice === "" ? null : Number(formData.expectedPrice),
+        }),
       });
-      toast.success("Service added successfully!");
+      toast.success("Service added successfully.");
       setIsModalOpen(false);
-      setFormData({ name: "", description: "", duration: 30, price: 0 }); // Reset form
-      fetchServices(); // Refresh list
+      setFormData(EMPTY_FORM);
+      setReloadKey((key) => key + 1);
     } catch (error) {
       console.error("Provider service creation failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to add service");
+      toast.error(error instanceof Error ? error.message : "Unable to add service.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle Delete
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
-    
+  const openEditService = (service: Service) => {
+    setEditingService(service);
+    setFormData({
+      name: service.name,
+      description: service.description ?? "",
+      durationMinutes: service.durationMinutes,
+      expectedPrice: service.expectedPrice === null ? "" : String(service.expectedPrice),
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateService = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingService) return;
+    setIsSubmitting(true);
     try {
-      await apiFetch(`/provider/services/${id}`, { method: "DELETE" });
-      toast.success("Service deleted");
-      fetchServices();
+      await apiFetch(`/provider/services/${editingService.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description || null,
+          durationMinutes: formData.durationMinutes,
+          expectedPrice: formData.expectedPrice === "" ? null : Number(formData.expectedPrice),
+        }),
+      });
+      toast.success("Service updated.");
+      setIsModalOpen(false);
+      setEditingService(null);
+      setIsLoading(true);
+      setReloadKey((key) => key + 1);
     } catch (error) {
-      console.error("Provider service deletion failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to delete service");
+      toast.error(error instanceof Error ? error.message : "Unable to update service.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (service: Service) => {
+    try {
+      await apiFetch(`/provider/services/${service.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: !service.active }),
+      });
+      toast.success(service.active ? "Service paused." : "Service activated.");
+      setIsLoading(true);
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update service status.");
+    }
+  };
+
+  const handleDelete = async (service: Service) => {
+    if (!window.confirm(`Delete ${service.name}? If it has booking history, it will be paused instead to preserve records.`)) return;
+    try {
+      const response = await apiFetch<{ action: "deleted" | "deactivated" }>(`/provider/services/${service.id}`, { method: "DELETE" });
+      toast.success(response.action === "deactivated" ? "Service deactivated." : "Service deleted.");
+      setIsLoading(true);
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      console.error("Provider service removal failed:", error);
+      toast.error(error instanceof Error ? error.message : "Unable to remove service.");
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">My Services</h1>
-          <p className="text-slate-500 mt-1">Manage the services your customers can book.</p>
+          <p className="mt-1 text-slate-500">Manage services customers can book.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-[#0F172A] shadow-sm transition hover:brightness-105"
-          style={{ background: `linear-gradient(135deg, ${ACCENT_TO}, ${ACCENT_FROM})` }}
-        >
-          <span>+</span> Add Service
+        <button type="button" onClick={() => setIsModalOpen(true)} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm hover:brightness-105" style={{ background: `linear-gradient(135deg, ${ACCENT_TO}, ${ACCENT_FROM})` }}>
+          Add service
         </button>
       </div>
 
-      {/* Services List */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isLoading ? (
-          <div className="p-8 text-center text-slate-500">Loading services...</div>
-        ) : services.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 text-sky-600 mb-4">
-              <span className="text-xl">◈</span>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No services yet</h3>
-            <p className="text-slate-500 max-w-sm mx-auto">Add your first service to start accepting bookings from customers.</p>
+          <div className="divide-y divide-slate-100 p-5" role="status" aria-label="Loading services">
+            {Array.from({ length: 3 }, (_, index) => <div key={index} className="flex animate-pulse items-center justify-between gap-5 py-5"><div className="w-full space-y-3"><div className="h-4 w-1/3 rounded bg-slate-200" /><div className="h-3 w-2/3 rounded bg-slate-100" /><div className="h-3 w-1/4 rounded bg-slate-100" /></div><div className="h-8 w-20 rounded bg-slate-100" /></div>)}
           </div>
+        ) : loadError ? (
+          <div className="p-8 text-center" role="alert"><p className="text-sm text-red-700">Services could not be loaded: {loadError}</p><button type="button" onClick={() => { setIsLoading(true); setReloadKey((key) => key + 1); }} className="mt-3 text-sm font-semibold text-sky-700 hover:underline">Retry</button></div>
+        ) : services.length === 0 ? (
+          <div className="p-12 text-center"><h2 className="font-semibold text-slate-900">No services yet</h2><p className="mt-2 text-sm text-slate-500">Add a service to make it available for future bookings.</p></div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {services.map((service) => (
-              <div key={service.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition gap-4">
-                <div>
-                  <h3 className="font-semibold text-slate-900">{service.name}</h3>
-                  <p className="text-sm text-slate-500 mt-1">{service.description || "No description provided."}</p>
-                  <div className="flex items-center gap-4 mt-2 text-sm font-medium text-slate-600">
-                    <span className="flex items-center gap-1">⏱ {service.duration} mins</span>
-                    <span className="flex items-center gap-1">💵 ${service.price}</span>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => handleDelete(service.id)}
-                  className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline w-fit"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+            {services.map((service) => <div key={service.id} className="m-4 flex flex-col justify-between gap-5 rounded-xl border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-3"><h2 className="font-semibold text-slate-900">{service.name}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${service.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{service.active ? "Active" : "Paused"}</span></div><p className="mt-1 text-sm text-slate-500">{service.description || "No description provided."}</p><div className="mt-2 flex flex-wrap gap-4 text-sm font-medium text-slate-600"><span>{service.durationMinutes} mins</span><span>{service.expectedPrice === null ? "Price not set" : `R${Number(service.expectedPrice).toFixed(2)} expected`}</span></div></div>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end"><button type="button" onClick={() => openEditService(service)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white">Edit</button><button type="button" onClick={() => void handleToggleActive(service)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white">{service.active ? "Pause" : "Resume"}</button><button type="button" onClick={() => void handleDelete(service)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button></div>
+            </div>)}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Add Service Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-900">Add New Service</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+      {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <section className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
+          <header className="flex items-center justify-between border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">{editingService ? "Edit service" : "Add service"}</h2><button type="button" aria-label="Close" onClick={() => { setIsModalOpen(false); setEditingService(null); setFormData(EMPTY_FORM); }} className="rounded p-2 text-slate-500 hover:bg-slate-100">×</button></header>
+          <form onSubmit={editingService ? handleUpdateService : handleAddService} className="space-y-4 p-5">
+            <label className="block text-sm font-medium text-slate-700">Service name<input required maxLength={100} value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+            <label className="block text-sm font-medium text-slate-700">Description (optional)<textarea maxLength={1000} value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows={3} /></label>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="block text-sm font-medium text-slate-700">Duration (minutes)<input required type="number" min={1} max={1440} value={formData.durationMinutes} onChange={(event) => setFormData({ ...formData, durationMinutes: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+              <label className="block text-sm font-medium text-slate-700">Expected price (R)<input type="number" min={0} step="0.01" value={formData.expectedPrice} onChange={(event) => setFormData({ ...formData, expectedPrice: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /><span className="mt-1 block text-xs text-slate-500">Optional and informational only.</span></label>
             </div>
-            
-            <form onSubmit={handleAddService} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Service Name</label>
-                <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 outline-none" placeholder="e.g. Haircut & Styling" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
-                <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 outline-none" rows={2} placeholder="Brief description" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Duration (mins)</label>
-                  <input required type="number" min="5" step="5" value={formData.duration} onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Price ($)</label>
-                  <input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
-                </div>
-              </div>
-              
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold text-[#0F172A] transition hover:brightness-105 disabled:opacity-50" style={{ background: `linear-gradient(135deg, ${ACCENT_TO}, ${ACCENT_FROM})` }}>
-                  {isSubmitting ? "Saving..." : "Save Service"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <footer className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => { setIsModalOpen(false); setEditingService(null); setFormData(EMPTY_FORM); }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={isSubmitting} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50" style={{ background: `linear-gradient(135deg, ${ACCENT_TO}, ${ACCENT_FROM})` }}>{isSubmitting ? "Saving..." : editingService ? "Save changes" : "Save service"}</button></footer>
+          </form>
+        </section>
+      </div>}
     </div>
   );
 }

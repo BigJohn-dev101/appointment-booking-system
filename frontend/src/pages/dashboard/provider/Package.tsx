@@ -86,7 +86,14 @@ export default function Package() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-slate-500">Loading subscription...</div>;
+    return (
+      <div className="mx-auto max-w-5xl animate-pulse space-y-6" role="status" aria-label="Loading subscription plans">
+        <div className="h-8 w-48 rounded bg-slate-200" />
+        <div className="grid gap-5 md:grid-cols-2">
+          {[0, 1].map((plan) => <div key={plan} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6"><div className="h-6 w-1/3 rounded bg-slate-200" /><div className="h-8 w-1/2 rounded bg-slate-100" /><div className="h-4 w-full rounded bg-slate-100" /><div className="h-4 w-4/5 rounded bg-slate-100" /><div className="h-10 w-full rounded-lg bg-slate-100" /></div>)}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -111,11 +118,11 @@ export default function Package() {
           <dl className="grid gap-6 p-6 sm:grid-cols-2">
             <div>
               <dt className="text-sm text-slate-500">Monthly price</dt>
-              <dd className="mt-1 font-semibold text-slate-900">{formatPrice(subscription.monthlyPrice)}</dd>
+              <dd className="mt-1 font-semibold text-slate-900">{subscription.tier === "BASIC" ? "Free" : formatPrice(subscription.monthlyPrice)}</dd>
             </div>
             <div>
               <dt className="text-sm text-slate-500">Payment status</dt>
-              <dd className="mt-1 font-semibold text-slate-900">{subscription.paymentStatus}</dd>
+              <dd className="mt-1 font-semibold text-slate-900">{subscription.tier === "BASIC" ? "Free" : subscription.paymentStatus}</dd>
             </div>
             <div>
               <dt className="text-sm text-slate-500">Daily appointment limit</dt>
@@ -123,14 +130,12 @@ export default function Package() {
                 {subscription.dailyAppointmentLimit ?? "No limit specified"}
               </dd>
             </div>
-            <div>
+            {subscription.tier === "GROWTH" && <div>
               <dt className="text-sm text-slate-500">Next billing date</dt>
               <dd className="mt-1 font-semibold text-slate-900">
-                {subscription.nextBillingDate
-                  ? new Date(subscription.nextBillingDate).toLocaleDateString()
-                  : "Not scheduled"}
+                {subscription.nextBillingDate ? new Date(subscription.nextBillingDate).toLocaleDateString() : "Not scheduled"}
               </dd>
-            </div>
+            </div>}
           </dl>
         </section>
       ) : (
@@ -166,8 +171,8 @@ export default function Package() {
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{plan.tier}</h3>
                   <p className="mt-2 text-2xl font-bold text-slate-900">
-                    {formatPrice(plan.monthlyPrice)}
-                    <span className="text-sm font-normal text-slate-500"> / month</span>
+                    {plan.tier === "BASIC" ? "Free" : formatPrice(plan.monthlyPrice)}
+                    {plan.tier === "GROWTH" && <span className="text-sm font-normal text-slate-500"> / month</span>}
                   </p>
                 </div>
                 {isCurrent && (

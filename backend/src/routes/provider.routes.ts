@@ -1,13 +1,17 @@
 import { Router } from "express";
 import {
-	createProviderService,
+	createProviderServicePhase1,
+	changeProviderSubscription,
 	deactivateProviderService,
 	getProviderAvailability,
+	getProviderAppointments,
 	getProviderDashboard,
+	getProviderPackages,
 	getProviderProfile,
-	getProviderServices,
+	getProviderServicesPhase1,
 	replaceProviderAvailability,
-	updateProviderProfile,
+	updateProviderProfilePhase1,
+	updateProviderAppointmentStatus,
 	updateProviderService,
 } from "../controllers/provider.controller.js";
 import { authenticate, requireRole } from "../middleware/auth.middleware.js";
@@ -16,12 +20,16 @@ const router: ReturnType<typeof Router> = Router();
 
 router.get("/dashboard", authenticate, requireRole("SOLE_PROVIDER"), getProviderDashboard);
 router.get("/profile", authenticate, requireRole("SOLE_PROVIDER"), getProviderProfile);
-router.patch("/profile", authenticate, requireRole("SOLE_PROVIDER"), updateProviderProfile);
-router.get("/services", authenticate, requireRole("SOLE_PROVIDER"), getProviderServices);
-router.post("/services", authenticate, requireRole("SOLE_PROVIDER"), createProviderService);
+router.patch("/profile", authenticate, requireRole("SOLE_PROVIDER"), updateProviderProfilePhase1);
+router.get("/services", authenticate, requireRole("SOLE_PROVIDER"), getProviderServicesPhase1);
+router.post("/services", authenticate, requireRole("SOLE_PROVIDER"), createProviderServicePhase1);
 router.patch("/services/:serviceId", authenticate, requireRole("SOLE_PROVIDER"), updateProviderService);
 router.delete("/services/:serviceId", authenticate, requireRole("SOLE_PROVIDER"), deactivateProviderService);
 router.get("/availability", authenticate, requireRole("SOLE_PROVIDER"), getProviderAvailability);
 router.put("/availability", authenticate, requireRole("SOLE_PROVIDER"), replaceProviderAvailability);
+router.get("/appointments", authenticate, requireRole("SOLE_PROVIDER"), getProviderAppointments);
+router.patch("/appointments/:id/status", authenticate, requireRole("SOLE_PROVIDER"), updateProviderAppointmentStatus);
+router.get("/packages", authenticate, requireRole("SOLE_PROVIDER"), getProviderPackages);
+router.patch("/subscription", authenticate, requireRole("SOLE_PROVIDER"), changeProviderSubscription);
 
 export default router;

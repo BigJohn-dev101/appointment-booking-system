@@ -21,19 +21,7 @@ export default function Appointments() {
   const [activeTab, setActiveTab] = useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
   const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("CALENDAR");
   const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch appointments
-  const fetchAppointments = async () => {
-    try {
-      const data = await apiFetch<Appointment[]>(`/provider/appointments?status=${activeTab}`);
-      setAppointments(data);
-    } catch (error) {
-      console.error("Provider appointments fetch failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to load appointments");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -55,17 +43,18 @@ export default function Appointments() {
     return () => {
       isMounted = false;
     };
-  }, [activeTab]);
+  }, [activeTab, refreshKey]);
 
   // Update Status
   const handleStatusUpdate = async (id: string, newStatus: string) => {
+    setIsLoading(true);
     try {
       await apiFetch(`/provider/appointments/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
       toast.success(`Appointment marked as ${newStatus.toLowerCase()}`);
-      fetchAppointments(); 
+      setRefreshKey((current) => current + 1);
     } catch (error) {
       console.error("Provider appointment status update failed:", error);
       toast.error(error instanceof Error ? error.message : "Failed to update appointment");
@@ -125,13 +114,20 @@ export default function Appointments() {
 
       {/* Conditionally Render based on View Mode */}
       {viewMode === "CALENDAR" ? (
-        <Calender appointments={appointments} />
+        isLoading ? (
+          <div className="animate-pulse space-y-4" role="status" aria-label="Loading appointment calendar">
+            <div className="h-12 rounded-lg bg-slate-100" />
+            <div className="h-[min(700px,calc(100vh_-_20rem))] min-h-[360px] rounded-2xl border border-slate-200 bg-white" />
+          </div>
+        ) : <Calender appointments={appointments} />
       ) : (
         <>
           {/* List */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {isLoading ? (
-              <div className="p-8 text-center text-slate-500">Loading appointments...</div>
+              <div className="divide-y divide-slate-100 p-5" role="status" aria-label="Loading appointments">
+                {Array.from({ length: 4 }, (_, index) => <div key={index} className="flex animate-pulse items-center gap-4 py-4"><div className="h-16 w-16 rounded-xl bg-slate-100" /><div className="flex-1 space-y-3"><div className="h-4 w-1/3 rounded bg-slate-200" /><div className="h-3 w-1/2 rounded bg-slate-100" /></div><div className="h-8 w-24 rounded bg-slate-100" /></div>)}
+              </div>
             ) : appointments.length === 0 ? (
               <div className="p-12 text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">

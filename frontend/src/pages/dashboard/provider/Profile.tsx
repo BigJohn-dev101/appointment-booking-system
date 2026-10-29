@@ -1,17 +1,18 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
 
 type ProfileForm = {
-  fullName: string;
-  phone: string;
+  displayName: string;
   serviceName: string;
   category: string;
   experience: string;
   city: string;
   bio: string;
 };
+
+type ProviderProfile = NonNullable<ReturnType<typeof useAuth>["user"]>["soleProvider"];
 
 const categories = [
   "Hair & Beauty",
@@ -29,18 +30,54 @@ const inputClass =
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
-  const profile = user?.soleProvider;
+  const [profile, setProfile] = useState<ProviderProfile>(user?.soleProvider ?? null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [form, setForm] = useState<ProfileForm>({
-    fullName: [user?.firstName, user?.lastName].filter(Boolean).join(" "),
-    phone: user?.phone ?? "",
+    displayName: user?.soleProvider?.displayName ?? "",
     serviceName: profile?.serviceName ?? "",
     category: profile?.category ?? "",
     experience: profile?.experience ?? "",
     city: profile?.city ?? "",
     bio: profile?.bio ?? "",
   });
+
+  useEffect(() => {
+    let active = true;
+    void apiFetch<{ success: boolean; profile: NonNullable<ProviderProfile> }>("/provider/profile")
+      .then(({ profile: currentProfile }) => {
+        if (!active) return;
+        setProfile(currentProfile);
+        setForm({
+          displayName: currentProfile.displayName,
+          serviceName: currentProfile.serviceName ?? "",
+          category: currentProfile.category ?? "",
+          experience: currentProfile.experience ?? "",
+          city: currentProfile.city ?? "",
+          bio: currentProfile.bio ?? "",
+        });
+      })
+      .catch((error: unknown) => {
+        console.error("Provider profile fetch failed:", error);
+        if (active) toast.error(error instanceof Error ? error.message : "Unable to load provider profile.");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-4xl animate-pulse" role="status" aria-label="Loading provider profile">
+        <div className="mb-8 h-8 w-48 rounded bg-slate-200" />
+        <div className="grid gap-6 rounded-2xl border border-slate-200 bg-white p-6 sm:grid-cols-2">
+          {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-5 rounded bg-slate-100" />)}
+        </div>
+      </div>
+    );
+  }
 
   if (!user || !profile) {
     return (
@@ -66,8 +103,7 @@ export default function Profile() {
 
   const cancelEdit = () => {
     setForm({
-      fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
-      phone: user.phone ?? "",
+      displayName: profile?.displayName ?? "",
       serviceName: profile.serviceName ?? "",
       category: profile.category ?? "",
       experience: profile.experience ?? "",
@@ -81,10 +117,11 @@ export default function Profile() {
     event.preventDefault();
     setIsSaving(true);
     try {
-      await apiFetch("/provider/profile", {
+      const response = await apiFetch<{ success: boolean; profile: NonNullable<ProviderProfile> }>("/provider/profile", {
         method: "PATCH",
         body: JSON.stringify(form),
       });
+      setProfile(response.profile);
       await refreshUser();
       toast.success("Profile updated.");
       setIsEditing(false);
@@ -133,27 +170,18 @@ export default function Profile() {
           <form onSubmit={saveProfile} className="space-y-5 p-6">
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
-                Name
+                Display name
                 <input
                   required
                   maxLength={100}
-                  value={form.fullName}
-                  onChange={(event) => updateForm("fullName", event.target.value)}
+                  value={form.displayName}
+                  onChange={(event) => updateForm("displayName", event.target.value)}
                   className={inputClass}
                 />
               </label>
               <label className="text-sm font-medium text-slate-700">
                 Email
-                <input value={user.email} disabled className={`${inputClass} bg-slate-50 text-slate-500`} />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Phone
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(event) => updateForm("phone", event.target.value)}
-                  className={inputClass}
-                />
+                <input type="email" value={user.email} readOnly aria-readonly="true" className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-500`} />
               </label>
               <label className="text-sm font-medium text-slate-700">
                 Service

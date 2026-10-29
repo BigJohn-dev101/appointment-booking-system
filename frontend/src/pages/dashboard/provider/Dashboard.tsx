@@ -41,9 +41,8 @@ type DashboardResponse = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
-  const providerName = authUser
-    ? `${authUser.firstName} ${authUser.lastName ?? ""}`.trim()
-    : "";
+  const providerName = authUser?.soleProvider?.displayName?.trim()
+    || (authUser ? `${authUser.firstName} ${authUser.lastName ?? ""}`.trim() : "");
 
   const [stats, setStats] = useState<DashboardStats>({
     todayBookings: 0,
@@ -53,6 +52,9 @@ export default function Dashboard() {
   });
   const [upcomingAppointments, setUpcomingAppointments] = useState<AppointmentItem[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!authUser) {
@@ -66,22 +68,43 @@ export default function Dashboard() {
     }
 
     const fetchDashboard = async () => {
+      setIsLoading(true);
+      setDashboardError(null);
       try {
         const response = await apiFetch<DashboardResponse>("/provider/dashboard");
+        if (!response.success) {
+          throw new Error("The server could not load provider dashboard data.");
+        }
         setStats(response.stats ?? { todayBookings: 0, upcomingBookings: 0, completedBookings: 0, cancelledBookings: 0 });
         setUpcomingAppointments(response.upcomingAppointments ?? []);
         setSubscription(response.subscription ?? null);
       } catch (error) {
         console.error("Provider dashboard fetch failed:", error);
-        toast.error("Unable to load dashboard data.");
+        const message = error instanceof Error ? error.message : "Unable to load dashboard data.";
+        setDashboardError(message);
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     void fetchDashboard();
-  }, [authUser, navigate]);
+  }, [authUser, navigate, reloadCount]);
 
   return (
     <>
+          {dashboardError && (
+            <div className="mb-6 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+              <p role="alert">Dashboard data could not be loaded: {dashboardError}</p>
+              <button
+                type="button"
+                onClick={() => setReloadCount((count) => count + 1)}
+                className="w-fit rounded-md border border-red-300 px-3 py-2 font-semibold hover:bg-red-100"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           {/* Welcome */}
           <section className="relative mb-8 overflow-hidden rounded-2xl bg-[#0B1220] p-6 text-white sm:p-8">
             <div
@@ -127,6 +150,11 @@ export default function Dashboard() {
           </section>
 
           {/* Stats */}
+          {isLoading ? (
+            <section className="mb-8 grid animate-pulse gap-4 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-label="Loading dashboard statistics">
+              {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-32 rounded-2xl border border-slate-200 bg-white p-5"><div className="h-4 w-2/3 rounded bg-slate-100" /><div className="mt-4 h-8 w-1/3 rounded bg-slate-200" /><div className="mt-3 h-3 w-1/2 rounded bg-slate-100" /></div>)}
+            </section>
+          ) : !dashboardError && (
           <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               title="Today's bookings"
@@ -156,6 +184,7 @@ export default function Dashboard() {
               icon="✕"
             />
           </section>
+          )}
 
           {/* Main grid */}
           <div className="grid gap-6 xl:grid-cols-3">
@@ -178,7 +207,13 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {upcomingAppointments.length === 0 ? (
+              {isLoading ? (
+                <div className="divide-y divide-slate-100 p-5" role="status" aria-label="Loading upcoming appointments">
+                  {Array.from({ length: 3 }, (_, index) => <div key={index} className="flex animate-pulse items-center gap-4 py-4"><div className="h-4 w-12 rounded bg-slate-100" /><div className="h-10 w-10 rounded-full bg-slate-200" /><div className="flex-1 space-y-2"><div className="h-4 w-1/3 rounded bg-slate-200" /><div className="h-3 w-1/4 rounded bg-slate-100" /></div></div>)}
+                </div>
+              ) : dashboardError ? (
+                <p className="p-6 text-sm text-slate-500">Dashboard data is unavailable.</p>
+              ) : upcomingAppointments.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 text-sky-700">
                     <svg
@@ -256,34 +291,38 @@ export default function Dashboard() {
               </div>
 
               <div className="p-5">
+                {isLoading ? (
+                  <div className="animate-pulse space-y-4" role="status" aria-label="Loading subscription">
+                    <div className="h-6 w-1/2 rounded bg-slate-200" />
+                    <div className="h-4 w-2/3 rounded bg-slate-100" />
+                    <div className="h-4 w-full rounded bg-slate-100" />
+                    <div className="h-4 w-full rounded bg-slate-100" />
+                  </div>
+                ) : dashboardError ? <p className="text-sm text-slate-500">Subscription data is unavailable.</p> : subscription ? (
+                <>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold">
-                    {subscription?.tier ?? "Basic"}
-                  </h3>
+                  <h3 className="text-xl font-bold">{subscription.tier}</h3>
 
                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    {subscription?.status ?? "Active"}
+                    {subscription.status}
                   </span>
                 </div>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  {subscription?.paymentStatus ?? "Free plan"}
+                  {subscription.tier === "BASIC" ? "Free" : "Paid"}
                 </p>
 
                 <div className="mt-5 space-y-3">
+                  {subscription.tier === "GROWTH" && subscription.monthlyPrice !== undefined && (
+                    <PackageLimit label="Monthly price" value={`R${Number(subscription.monthlyPrice).toFixed(2)} / month`} />
+                  )}
                   <PackageLimit
                     label="Daily bookings"
-                    value={String(subscription?.dailyAppointmentLimit ?? "6")}
+                    value={String(subscription.dailyAppointmentLimit ?? "Not set")}
                   />
-                  <PackageLimit label="Profile placement" value="Standard" />
-                  <PackageLimit
-                    label="Next billing"
-                    value={
-                      subscription?.nextBillingDate
-                        ? new Date(subscription.nextBillingDate).toLocaleDateString()
-                        : "N/A"
-                    }
-                  />
+                  {subscription.tier === "GROWTH" && (
+                    <PackageLimit label="Next billing" value={subscription.nextBillingDate ? new Date(subscription.nextBillingDate).toLocaleDateString() : "Not scheduled"} />
+                  )}
                 </div>
 
                 <button
@@ -293,6 +332,8 @@ export default function Dashboard() {
                 >
                   View subscription
                 </button>
+                </>
+                ) : <p className="text-sm text-slate-500">No active subscription found.</p>}
               </div>
             </section>
           </div>
