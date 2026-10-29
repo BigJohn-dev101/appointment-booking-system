@@ -31,7 +31,7 @@ export const getProviderProfile = async (req: AuthenticatedRequest, res: Respons
   }
 };
 
-export const updateProviderProfile = async (req: AuthenticatedRequest, res: Response) => {
+export const updateProviderProfilePhase1 = async (req: AuthenticatedRequest, res: Response) => {
   const allowedFields = new Set(["displayName", "serviceName", "category", "experience", "bio", "city"]);
   const body = req.body as Record<string, unknown>;
   const unsupportedField = Object.keys(body ?? {}).find((field) => !allowedFields.has(field));
@@ -94,7 +94,7 @@ export const updateProviderProfile = async (req: AuthenticatedRequest, res: Resp
   }
 };
 
-export const getProviderServices = async (req: AuthenticatedRequest, res: Response) => {
+export const getProviderServicesPhase1 = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const provider = await prisma.soleProvider.findUnique({
       where: { userId: req.user!.userId },
@@ -115,7 +115,7 @@ export const getProviderServices = async (req: AuthenticatedRequest, res: Respon
   }
 };
 
-export const createProviderService = async (req: AuthenticatedRequest, res: Response) => {
+export const createProviderServicePhase1 = async (req: AuthenticatedRequest, res: Response) => {
   const parsed = parseServicePayload(req.body);
   if (!parsed.ok) {
     return res.status(400).json({ success: false, message: parsed.error });
@@ -280,101 +280,6 @@ export const replaceProviderAvailability = async (req: AuthenticatedRequest, res
 const getSoleProvider = async (userId: string) =>
   prisma.soleProvider.findUnique({ where: { userId }, select: { id: true } });
 
-export const updateProviderProfile = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "Authentication required" });
-    }
-
-    const { fullName, phone, serviceName, category, experience, city, bio } = req.body as {
-      fullName?: unknown;
-      phone?: unknown;
-      serviceName?: unknown;
-      category?: unknown;
-      experience?: unknown;
-      city?: unknown;
-      bio?: unknown;
-    };
-
-    if (
-      typeof fullName !== "string" ||
-      !/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(fullName.trim()) ||
-      (phone !== undefined && typeof phone !== "string") ||
-      typeof serviceName !== "string" ||
-      !serviceName.trim() ||
-      serviceName.trim().length > 100 ||
-      typeof category !== "string" ||
-      !category.trim() ||
-      category.trim().length > 100 ||
-      typeof experience !== "string" ||
-      !experience.trim() ||
-      experience.trim().length > 100 ||
-      typeof city !== "string" ||
-      !city.trim() ||
-      city.trim().length > 100 ||
-      (bio !== undefined && typeof bio !== "string") ||
-      (typeof bio === "string" && bio.trim().length > 500)
-    ) {
-      return res.status(400).json({ success: false, message: "Please provide valid profile details" });
-    }
-
-    const phoneValue = typeof phone === "string" ? phone.trim() : "";
-    let normalizedPhone: string | null = null;
-    if (phoneValue) {
-      const digitsAndPlus = phoneValue.replace(/(?!^\+)[^\d]/g, "");
-      if (digitsAndPlus.startsWith("+27")) {
-        normalizedPhone = digitsAndPlus;
-      } else if (digitsAndPlus.startsWith("0")) {
-        normalizedPhone = `+27${digitsAndPlus.slice(1)}`;
-      } else if (digitsAndPlus.startsWith("27")) {
-        normalizedPhone = `+${digitsAndPlus}`;
-      }
-
-      if (!normalizedPhone || !/^\+27\d{9}$/.test(normalizedPhone)) {
-        return res.status(400).json({ success: false, message: "Enter a valid South African phone number" });
-      }
-    }
-
-    const [existingPhone, existingBusinessPhone] = normalizedPhone
-      ? await Promise.all([
-          prisma.user.findFirst({
-            where: { phone: normalizedPhone, id: { not: req.user.userId } },
-            select: { id: true },
-          }),
-          prisma.business.findFirst({ where: { phone: normalizedPhone }, select: { id: true } }),
-        ])
-      : [null, null];
-    if (existingPhone || existingBusinessPhone) {
-      return res.status(409).json({ success: false, message: "That phone number is already in use" });
-    }
-
-    const [firstName = "", ...lastNameParts] = fullName.trim().split(/\s+/);
-    const lastName = lastNameParts.join(" ") || null;
-    const [updatedUser, updatedProvider] = await prisma.$transaction([
-      prisma.user.update({
-        where: { id: req.user.userId },
-        data: { firstName, lastName, phone: normalizedPhone },
-        select: { id: true },
-      }),
-      prisma.soleProvider.update({
-        where: { userId: req.user.userId },
-        data: {
-          displayName: fullName.trim(),
-          serviceName: serviceName.trim(),
-          category: category.trim(),
-          experience: experience.trim(),
-          city: city.trim(),
-          bio: typeof bio === "string" && bio.trim() ? bio.trim() : null,
-        },
-      }),
-    ]);
-
-    return res.status(200).json({ success: true, profile: updatedProvider, userId: updatedUser.id });
-  } catch (error) {
-    console.error("Provider profile update failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to update profile" });
-  }
-};
 
 export const getProviderDashboard = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -583,92 +488,7 @@ export const changeProviderSubscription = async (req: AuthenticatedRequest, res:
   }
 };
 
-export const getProviderServices = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "Authentication required" });
-    }
 
-    const provider = await getSoleProvider(req.user.userId);
-    if (!provider) {
-      return res.status(404).json({ success: false, message: "Sole provider profile not found" });
-    }
-
-    const services = await prisma.service.findMany({
-      where: { soleProviderId: provider.id },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return res.status(200).json(services.map((service) => ({
-      id: service.id,
-      name: service.name,
-      description: service.description,
-      duration: service.durationMinutes,
-      price: service.expectedPrice === null ? 0 : Number(service.expectedPrice),
-    })));
-  } catch (error) {
-    console.error("Provider services fetch failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to load services" });
-  }
-};
-
-export const createProviderService = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "Authentication required" });
-    }
-
-    const { name, description, duration, price } = req.body as {
-      name?: unknown;
-      description?: unknown;
-      duration?: unknown;
-      price?: unknown;
-    };
-
-    if (
-      typeof name !== "string" ||
-      !name.trim() ||
-      name.trim().length > 100 ||
-      (description !== undefined && typeof description !== "string") ||
-      (typeof description === "string" && description.length > 500) ||
-      typeof duration !== "number" ||
-      !Number.isInteger(duration) ||
-      duration < 5 ||
-      duration > 1440 ||
-      typeof price !== "number" ||
-      !Number.isFinite(price) ||
-      price < 0
-    ) {
-      return res.status(400).json({ success: false, message: "Please provide valid service details" });
-    }
-
-    const provider = await getSoleProvider(req.user.userId);
-    if (!provider) {
-      return res.status(404).json({ success: false, message: "Sole provider profile not found" });
-    }
-
-    const service = await prisma.service.create({
-      data: {
-        soleProviderId: provider.id,
-        name: name.trim(),
-        description: typeof description === "string" && description.trim() ? description.trim() : null,
-        durationMinutes: duration,
-        expectedPrice: price,
-      },
-    });
-
-    return res.status(201).json({
-      id: service.id,
-      name: service.name,
-      description: service.description,
-      duration: service.durationMinutes,
-      price: service.expectedPrice === null ? 0 : Number(service.expectedPrice),
-    });
-  } catch (error) {
-    console.error("Provider service creation failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to create service" });
-  }
-};
 
 export const deleteProviderService = async (req: AuthenticatedRequest, res: Response) => {
   try {

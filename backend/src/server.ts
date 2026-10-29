@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes.js";
 import providerRoutes from "./routes/provider.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
+import publicProviderRoutes from "./routes/public-provider.routes.js";
 
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
@@ -31,6 +32,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/provider", providerRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/customer", customerRoutes);
+app.use("/api/providers", publicProviderRoutes);
 
 app.get("/api/health", async (_req, res) => {
   try {

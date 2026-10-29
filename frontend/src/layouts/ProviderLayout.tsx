@@ -26,11 +26,11 @@ export default function ProviderLayout() {
     );
   }
 
-  const fullName = `${user.firstName} ${user.lastName ?? ""}`.trim();
-  const initials = `${user.firstName.charAt(0)}${user.lastName?.charAt(0) ?? ""}`.toUpperCase();
+  const providerName = user.soleProvider?.displayName?.trim() || `${user.firstName} ${user.lastName ?? ""}`.trim();
+  const initials = providerName.split(/\s+/).map((part) => part[0] ?? "").join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="flex min-h-screen bg-[#F4F7FB] text-slate-900">
       {mobileMenuOpen && (
         <button
           type="button"
@@ -65,7 +65,7 @@ export default function ProviderLayout() {
 
         <div className="border-b border-white/10 px-6 py-5">
           <p className="text-xs font-medium text-slate-400">Signed in as</p>
-          <h2 className="mt-1 truncate text-base font-semibold text-white">{fullName}</h2>
+          <h2 className="mt-1 truncate text-base font-semibold text-white">{providerName}</h2>
           <p className="mt-1 text-sm text-slate-400">Sole Provider</p>
         </div>
 
@@ -110,7 +110,7 @@ export default function ProviderLayout() {
         </div>
       </aside>
 
-      <div className="lg:pl-64">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-64">
         <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -170,18 +170,18 @@ export default function ProviderLayout() {
                 {initials}
               </div>
               <div>
-                <p className="text-sm font-semibold">{fullName}</p>
+                <p className="text-sm font-semibold">{providerName}</p>
                 <p className="text-xs text-slate-500">Sole Provider</p>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-10rem)] overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
 
-        <footer className="border-t border-slate-200 bg-white px-4 py-6 sm:px-6 lg:px-8">
+        <footer className="mt-auto border-t border-slate-200 bg-white px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-3 text-xs text-slate-500 sm:flex-row">
             <p>© {new Date().getFullYear()} ITThynkAppoint. All rights reserved.</p>
             <div className="flex items-center gap-5">

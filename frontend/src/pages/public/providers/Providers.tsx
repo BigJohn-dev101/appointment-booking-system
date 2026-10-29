@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-
-import {
-  providers,
-  type Provider,
-} from "../../../data/providers";
+import { fetchProviders } from "../../../services/providers";
+import type { Provider } from "../../../types/providers";
 
 const PROVIDERS_PER_PAGE = 6;
 
 export default function Providers() {
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetchProviders()
+      .then((data) => { if (active) setProviders(data); })
+      .catch((error: unknown) => {
+        console.error("Public provider list fetch failed:", error);
+        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load providers.");
+      })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const categories = useMemo(() => {
     return [
@@ -20,7 +32,7 @@ export default function Providers() {
         new Set(providers.map((provider) => provider.category))
       ),
     ];
-  }, []);
+  }, [providers]);
 
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -40,19 +52,9 @@ export default function Providers() {
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [providers, searchQuery, selectedCategory]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProviders.length / PROVIDERS_PER_PAGE));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategory]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   const paginatedProviders = filteredProviders.slice(
     (currentPage - 1) * PROVIDERS_PER_PAGE,
@@ -102,9 +104,10 @@ export default function Providers() {
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) =>
-                  setSearchQuery(event.target.value)
-                }
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Search providers or services..."
                 className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-12 pr-4 text-sm text-[#334155] outline-none transition focus:border-[#0EA5E9] focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400"
               />
@@ -118,7 +121,10 @@ export default function Providers() {
                   <button
                     key={category}
                     type="button"
-                    onClick={() => setSelectedCategory(category)}
+                    onClick={() => {
+                      setSelectedCategory(category);
+                      setCurrentPage(1);
+                    }}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       isSelected
                         ? "bg-[#0EA5E9] text-white shadow-[0_4px_14px_-4px_rgba(14,165,233,0.5)]"
@@ -162,7 +168,13 @@ export default function Providers() {
             )}
           </div>
 
-          {filteredProviders.length > 0 ? (
+          {isLoading ? (
+            <div className="grid animate-pulse gap-6 md:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Loading providers">
+              {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-80 rounded-2xl border border-slate-200 bg-white p-6"><div className="h-14 w-14 rounded-xl bg-slate-200" /><div className="mt-6 h-5 w-2/3 rounded bg-slate-200" /><div className="mt-3 h-4 w-1/3 rounded bg-slate-100" /><div className="mt-6 h-16 rounded bg-slate-100" /><div className="mt-8 h-10 rounded bg-slate-100" /></div>)}
+            </div>
+          ) : loadError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800" role="alert">Providers could not be loaded: {loadError}</div>
+          ) : filteredProviders.length > 0 ? (
             <>
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {paginatedProviders.map((provider) => (

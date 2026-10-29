@@ -81,6 +81,7 @@ export default function AppRoutes() {
         <Route path="services" element={<Services />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="availability" element={<Availability />} />
+        <Route path="availability/edit" element={<Availability editMode />} />
         <Route path="profile" element={<ProviderProfilePage />} />
         <Route path="subscription" element={<ProviderPackage />} />
       </Route>
