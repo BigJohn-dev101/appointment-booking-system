@@ -17,7 +17,15 @@ export type AuthUser = {
   lastName?: string | null;
   phone?: string | null;
   role: string;
-  soleProvider?: unknown;
+  soleProvider?: {
+    id: string;
+    displayName: string;
+    serviceName?: string | null;
+    category?: string | null;
+    experience?: string | null;
+    bio?: string | null;
+    city?: string | null;
+  } | null;
   business?: unknown;
   businessStaff?: unknown;
 };
