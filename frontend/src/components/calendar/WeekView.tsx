@@ -50,7 +50,7 @@ export default function WeekView({ currentDate, appointments }: WeekViewProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[700px]">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full h-[min(700px,calc(100vh_-_20rem))] min-h-[360px]">
       {/* Header Row (Days) */}
       <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-50">
         <div className="p-3 text-xs font-semibold text-slate-400 text-center border-r border-slate-200 flex items-center justify-center">

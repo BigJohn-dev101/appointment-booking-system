@@ -1,9 +1,46 @@
-import { Link } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import toast from "react-hot-toast";
+import { apiFetch } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
 
+type ProfileForm = {
+  fullName: string;
+  phone: string;
+  serviceName: string;
+  category: string;
+  experience: string;
+  city: string;
+  bio: string;
+};
+
+const categories = [
+  "Hair & Beauty",
+  "Health & Wellness",
+  "Fitness & Coaching",
+  "Home Services",
+  "Tutoring & Lessons",
+  "Other",
+];
+
+const experienceOptions = ["Just starting out", "1–3 years", "4–9 years", "10+ years"];
+
+const inputClass =
+  "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100";
+
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const profile = user?.soleProvider;
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState<ProfileForm>({
+    fullName: [user?.firstName, user?.lastName].filter(Boolean).join(" "),
+    phone: user?.phone ?? "",
+    serviceName: profile?.serviceName ?? "",
+    category: profile?.category ?? "",
+    experience: profile?.experience ?? "",
+    city: profile?.city ?? "",
+    bio: profile?.bio ?? "",
+  });
 
   if (!user || !profile) {
     return (
@@ -23,6 +60,42 @@ export default function Profile() {
     { label: "City or service area", value: profile.city },
   ];
 
+  const updateForm = (field: keyof ProfileForm, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const cancelEdit = () => {
+    setForm({
+      fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
+      phone: user.phone ?? "",
+      serviceName: profile.serviceName ?? "",
+      category: profile.category ?? "",
+      experience: profile.experience ?? "",
+      city: profile.city ?? "",
+      bio: profile.bio ?? "",
+    });
+    setIsEditing(false);
+  };
+
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSaving(true);
+    try {
+      await apiFetch("/provider/profile", {
+        method: "PATCH",
+        body: JSON.stringify(form),
+      });
+      await refreshUser();
+      toast.success("Profile updated.");
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Provider profile update failed:", error);
+      toast.error(error instanceof Error ? error.message : "Unable to update profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -30,32 +103,143 @@ export default function Profile() {
           <h1 className="text-2xl font-bold text-slate-900">My profile</h1>
           <p className="mt-1 text-slate-500">Review your account and public provider details.</p>
         </div>
-        <Link
-          to={`/providers/${profile.id}`}
-          className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700"
-        >
-          View public profile
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          
+          {isEditing ? (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700"
+            >
+              Edit profile
+            </button>
+          )}
+        </div>
       </div>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-6">
           <h2 className="font-semibold text-slate-900">Provider information</h2>
         </div>
-        <dl className="grid gap-x-8 gap-y-6 p-6 sm:grid-cols-2">
-          {fields.map(({ label, value }) => (
-            <div key={label}>
-              <dt className="text-sm text-slate-500">{label}</dt>
-              <dd className="mt-1 font-medium text-slate-900">{value || "Not provided"}</dd>
+        {isEditing ? (
+          <form onSubmit={saveProfile} className="space-y-5 p-6">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                Name
+                <input
+                  required
+                  maxLength={100}
+                  value={form.fullName}
+                  onChange={(event) => updateForm("fullName", event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Email
+                <input value={user.email} disabled className={`${inputClass} bg-slate-50 text-slate-500`} />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Phone
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(event) => updateForm("phone", event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Service
+                <input
+                  required
+                  maxLength={100}
+                  value={form.serviceName}
+                  onChange={(event) => updateForm("serviceName", event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Category
+                <select
+                  required
+                  value={form.category}
+                  onChange={(event) => updateForm("category", event.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Years of experience
+                <select
+                  required
+                  value={form.experience}
+                  onChange={(event) => updateForm("experience", event.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select experience</option>
+                  {experienceOptions.map((experience) => (
+                    <option key={experience} value={experience}>{experience}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+                City or service area
+                <input
+                  required
+                  maxLength={100}
+                  value={form.city}
+                  onChange={(event) => updateForm("city", event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+                About
+                <textarea
+                  maxLength={500}
+                  rows={4}
+                  value={form.bio}
+                  onChange={(event) => updateForm("bio", event.target.value)}
+                  className={inputClass}
+                />
+              </label>
             </div>
-          ))}
-          <div className="sm:col-span-2">
-            <dt className="text-sm text-slate-500">About</dt>
-            <dd className="mt-1 whitespace-pre-wrap font-medium text-slate-900">
-              {profile.bio || "Not provided"}
-            </dd>
-          </div>
-        </dl>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <dl className="grid gap-x-8 gap-y-6 p-6 sm:grid-cols-2">
+            {fields.map(({ label, value }) => (
+              <div key={label}>
+                <dt className="text-sm text-slate-500">{label}</dt>
+                <dd className="mt-1 font-medium text-slate-900">{value || "Not provided"}</dd>
+              </div>
+            ))}
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-slate-500">About</dt>
+              <dd className="mt-1 whitespace-pre-wrap font-medium text-slate-900">
+                {profile.bio || "Not provided"}
+              </dd>
+            </div>
+          </dl>
+        )}
       </section>
     </div>
   );

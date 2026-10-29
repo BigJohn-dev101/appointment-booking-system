@@ -2,60 +2,102 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../../services/api";
 
+type PlanTier = "BASIC" | "GROWTH";
+
 type SubscriptionInfo = {
-  tier: string;
+  tier: PlanTier;
   status: string;
   paymentStatus: string;
   dailyAppointmentLimit?: number | null;
-  monthlyPrice?: number | string | null;
+  monthlyPrice: number;
   nextBillingDate?: string | null;
+};
+
+type Plan = {
+  tier: PlanTier;
+  monthlyPrice: number;
+  dailyAppointmentLimit: number | null;
+  featureFlags: Record<string, boolean> | null;
 };
 
 type DashboardResponse = {
   subscription: SubscriptionInfo | null;
 };
 
+const featureLabels: Record<string, string> = {
+  standardPlacement: "Standard placement",
+  featuredPlacement: "Featured placement",
+  repeatCustomerAnalytics: "Repeat-customer analytics",
+  customBranding: "Custom profile branding",
+};
+
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "ZAR",
+    maximumFractionDigits: 0,
+  }).format(price);
+
 export default function Package() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [changingTier, setChangingTier] = useState<PlanTier | null>(null);
 
   useEffect(() => {
-    const fetchSubscription = async () => {
+    const fetchDetails = async () => {
       try {
-        const response = await apiFetch<DashboardResponse>("/provider/dashboard");
-        setSubscription(response.subscription);
+        const [dashboard, availablePlans] = await Promise.all([
+          apiFetch<DashboardResponse>("/provider/dashboard"),
+          apiFetch<Plan[]>("/provider/packages"),
+        ]);
+        setSubscription(dashboard.subscription);
+        setPlans(availablePlans);
       } catch (error) {
         console.error("Provider subscription fetch failed:", error);
-        toast.error("Unable to load subscription details.");
+        toast.error(error instanceof Error ? error.message : "Unable to load subscription details.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    void fetchSubscription();
+    void fetchDetails();
   }, []);
+
+  const changePlan = async (tier: PlanTier) => {
+    setChangingTier(tier);
+    try {
+      const response = await apiFetch<{ subscription: SubscriptionInfo }>("/provider/subscription", {
+        method: "PATCH",
+        body: JSON.stringify({ tier }),
+      });
+      setSubscription(response.subscription);
+      toast.success(
+        response.subscription.paymentStatus === "PENDING"
+          ? "Plan updated. Payment is pending."
+          : "Plan updated successfully.",
+      );
+    } catch (error) {
+      console.error("Provider subscription change failed:", error);
+      toast.error(error instanceof Error ? error.message : "Unable to change plan.");
+    } finally {
+      setChangingTier(null);
+    }
+  };
 
   if (isLoading) {
     return <div className="p-8 text-center text-slate-500">Loading subscription...</div>;
   }
 
-  const monthlyPrice = subscription?.monthlyPrice;
-  const formattedPrice = monthlyPrice == null
-    ? "Included with your plan"
-    : new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency: "ZAR",
-      }).format(Number(monthlyPrice));
-
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Subscription</h1>
-        <p className="mt-1 text-slate-500">Review your current provider plan and billing details.</p>
+        <p className="mt-1 text-slate-500">Review your plan or switch to another plan.</p>
       </div>
 
       {subscription ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-6 sm:flex-row sm:items-center">
             <div>
               <p className="text-sm text-slate-500">Current plan</p>
@@ -69,7 +111,7 @@ export default function Package() {
           <dl className="grid gap-6 p-6 sm:grid-cols-2">
             <div>
               <dt className="text-sm text-slate-500">Monthly price</dt>
-              <dd className="mt-1 font-semibold text-slate-900">{formattedPrice}</dd>
+              <dd className="mt-1 font-semibold text-slate-900">{formatPrice(subscription.monthlyPrice)}</dd>
             </div>
             <div>
               <dt className="text-sm text-slate-500">Payment status</dt>
@@ -92,12 +134,91 @@ export default function Package() {
           </dl>
         </section>
       ) : (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="font-semibold text-slate-900">No active subscription</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            There is currently no active plan linked to your provider account.
-          </p>
+          <p className="mt-2 text-sm text-slate-500">Choose a plan below to activate your provider subscription.</p>
         </section>
+      )}
+
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-slate-900">Available plans</h2>
+        <p className="mt-1 text-sm text-slate-500">Choose a plan to switch immediately.</p>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        {plans.map((plan) => {
+          const isCurrent = subscription?.tier === plan.tier;
+          const isChanging = changingTier === plan.tier;
+          const targetIsUpgrade =
+            subscription !== null && plan.monthlyPrice > subscription.monthlyPrice;
+          const enabledFeatures = Object.entries(plan.featureFlags ?? {})
+            .filter(([feature, enabled]) => enabled && featureLabels[feature])
+            .map(([feature]) => featureLabels[feature]);
+
+          return (
+            <section
+              key={plan.tier}
+              className={`flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
+                isCurrent ? "border-sky-300 ring-1 ring-sky-200" : "border-slate-200"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{plan.tier}</h3>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {formatPrice(plan.monthlyPrice)}
+                    <span className="text-sm font-normal text-slate-500"> / month</span>
+                  </p>
+                </div>
+                {isCurrent && (
+                  <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                    Current plan
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-5 text-sm text-slate-600">
+                {plan.dailyAppointmentLimit === null
+                  ? "No daily appointment limit"
+                  : `Up to ${plan.dailyAppointmentLimit} appointments per day`}
+              </p>
+
+              <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-600">
+                {enabledFeatures.map((feature) => (
+                  <li key={feature} className="flex gap-2">
+                    <span className="font-semibold text-emerald-600" aria-hidden="true">✓</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                disabled={isCurrent || changingTier !== null}
+                onClick={() => void changePlan(plan.tier)}
+                className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed ${
+                  isCurrent
+                    ? "bg-slate-100 text-slate-500"
+                    : "bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60"
+                }`}
+              >
+                {isChanging
+                  ? "Updating plan..."
+                  : isCurrent
+                    ? "Current plan"
+                    : subscription
+                      ? `${targetIsUpgrade ? "Upgrade" : "Downgrade"} to ${plan.tier}`
+                      : `Choose ${plan.tier}`}
+              </button>
+            </section>
+          );
+        })}
+      </div>
+
+      {plans.length > 0 && (
+        <p className="mt-5 text-sm text-slate-500">
+          Plan changes take effect immediately. A paid plan will show payment as pending until it is processed.
+        </p>
       )}
     </div>
   );

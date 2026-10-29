@@ -19,7 +19,7 @@ const appointmentTabs = ["UPCOMING", "COMPLETED", "CANCELLED"] as const;
 export default function Appointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [activeTab, setActiveTab] = useState<"UPCOMING" | "COMPLETED" | "CANCELLED">("UPCOMING");
-  const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("LIST"); // NEW: View Toggle
+  const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("CALENDAR");
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch appointments
@@ -76,14 +76,37 @@ export default function Appointments() {
     // Changed max-w-5xl to max-w-7xl to give the calendar more room
     <div className="max-w-7xl mx-auto">
       
-      {/* Header with View Toggle */}
+      {/* Header with appointment status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Appointments</h1>
           <p className="text-slate-500 mt-1">View and manage your customer bookings.</p>
         </div>
 
-        {/* NEW: Toggle between List and Calendar */}
+        <label className="flex items-center gap-3 text-sm font-medium text-slate-600">
+          Appointment status
+          <select
+            value={activeTab}
+            onChange={(event) => {
+              const nextTab = appointmentTabs.find((tab) => tab === event.target.value);
+              if (nextTab) {
+                setIsLoading(true);
+                setActiveTab(nextTab);
+              }
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+          >
+            {appointmentTabs.map((tab) => (
+              <option key={tab} value={tab}>
+                {tab.charAt(0) + tab.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* Toggle between List and Calendar */}
+      <div className="mb-6">
         <div className="flex bg-slate-100 p-1 rounded-lg w-fit">
           <button 
             onClick={() => setViewMode("LIST")}
@@ -105,26 +128,6 @@ export default function Appointments() {
         <Calender appointments={appointments} />
       ) : (
         <>
-          {/* Tabs */}
-          <div className="flex border-b border-slate-200 mb-6">
-            {appointmentTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setIsLoading(true);
-                  setActiveTab(tab);
-                }}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab
-                    ? "border-sky-500 text-sky-600"
-                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-                }`}
-              >
-                {tab.charAt(0) + tab.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-
           {/* List */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {isLoading ? (

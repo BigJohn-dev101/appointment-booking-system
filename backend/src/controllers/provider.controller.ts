@@ -5,6 +5,102 @@ import prisma from "../lib/prisma.js";
 const getSoleProvider = async (userId: string) =>
   prisma.soleProvider.findUnique({ where: { userId }, select: { id: true } });
 
+export const updateProviderProfile = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    const { fullName, phone, serviceName, category, experience, city, bio } = req.body as {
+      fullName?: unknown;
+      phone?: unknown;
+      serviceName?: unknown;
+      category?: unknown;
+      experience?: unknown;
+      city?: unknown;
+      bio?: unknown;
+    };
+
+    if (
+      typeof fullName !== "string" ||
+      !/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(fullName.trim()) ||
+      (phone !== undefined && typeof phone !== "string") ||
+      typeof serviceName !== "string" ||
+      !serviceName.trim() ||
+      serviceName.trim().length > 100 ||
+      typeof category !== "string" ||
+      !category.trim() ||
+      category.trim().length > 100 ||
+      typeof experience !== "string" ||
+      !experience.trim() ||
+      experience.trim().length > 100 ||
+      typeof city !== "string" ||
+      !city.trim() ||
+      city.trim().length > 100 ||
+      (bio !== undefined && typeof bio !== "string") ||
+      (typeof bio === "string" && bio.trim().length > 500)
+    ) {
+      return res.status(400).json({ success: false, message: "Please provide valid profile details" });
+    }
+
+    const phoneValue = typeof phone === "string" ? phone.trim() : "";
+    let normalizedPhone: string | null = null;
+    if (phoneValue) {
+      const digitsAndPlus = phoneValue.replace(/(?!^\+)[^\d]/g, "");
+      if (digitsAndPlus.startsWith("+27")) {
+        normalizedPhone = digitsAndPlus;
+      } else if (digitsAndPlus.startsWith("0")) {
+        normalizedPhone = `+27${digitsAndPlus.slice(1)}`;
+      } else if (digitsAndPlus.startsWith("27")) {
+        normalizedPhone = `+${digitsAndPlus}`;
+      }
+
+      if (!normalizedPhone || !/^\+27\d{9}$/.test(normalizedPhone)) {
+        return res.status(400).json({ success: false, message: "Enter a valid South African phone number" });
+      }
+    }
+
+    const [existingPhone, existingBusinessPhone] = normalizedPhone
+      ? await Promise.all([
+          prisma.user.findFirst({
+            where: { phone: normalizedPhone, id: { not: req.user.userId } },
+            select: { id: true },
+          }),
+          prisma.business.findFirst({ where: { phone: normalizedPhone }, select: { id: true } }),
+        ])
+      : [null, null];
+    if (existingPhone || existingBusinessPhone) {
+      return res.status(409).json({ success: false, message: "That phone number is already in use" });
+    }
+
+    const [firstName = "", ...lastNameParts] = fullName.trim().split(/\s+/);
+    const lastName = lastNameParts.join(" ") || null;
+    const [updatedUser, updatedProvider] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: req.user.userId },
+        data: { firstName, lastName, phone: normalizedPhone },
+        select: { id: true },
+      }),
+      prisma.soleProvider.update({
+        where: { userId: req.user.userId },
+        data: {
+          displayName: fullName.trim(),
+          serviceName: serviceName.trim(),
+          category: category.trim(),
+          experience: experience.trim(),
+          city: city.trim(),
+          bio: typeof bio === "string" && bio.trim() ? bio.trim() : null,
+        },
+      }),
+    ]);
+
+    return res.status(200).json({ success: true, profile: updatedProvider, userId: updatedUser.id });
+  } catch (error) {
+    console.error("Provider profile update failed:", error);
+    return res.status(500).json({ success: false, message: "Unable to update profile" });
+  }
+};
+
 export const getProviderDashboard = async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -89,6 +185,126 @@ export const getProviderDashboard = async (req: AuthenticatedRequest, res: Respo
   } catch (error) {
     console.error("Provider dashboard error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong while loading the dashboard" });
+  }
+};
+
+export const getProviderPackages = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    const packages = await prisma.package.findMany({
+      where: { providerType: "SOLE_PROVIDER" },
+      orderBy: { monthlyPrice: "asc" },
+      select: {
+        tier: true,
+        monthlyPrice: true,
+        dailyAppointmentLimit: true,
+        featureFlags: true,
+      },
+    });
+
+    return res.status(200).json(packages.map((pkg) => ({
+      ...pkg,
+      monthlyPrice: Number(pkg.monthlyPrice),
+    })));
+  } catch (error) {
+    console.error("Provider packages fetch failed:", error);
+    return res.status(500).json({ success: false, message: "Unable to load provider plans" });
+  }
+};
+
+export const changeProviderSubscription = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    const { tier } = req.body as { tier?: unknown };
+    if (tier !== "BASIC" && tier !== "GROWTH") {
+      return res.status(400).json({ success: false, message: "Select a valid provider plan" });
+    }
+
+    const provider = await getSoleProvider(req.user.userId);
+    if (!provider) {
+      return res.status(404).json({ success: false, message: "Sole provider profile not found" });
+    }
+
+    const [selectedPackage, currentSubscription] = await Promise.all([
+      prisma.package.findUnique({
+        where: { providerType_tier: { providerType: "SOLE_PROVIDER", tier } },
+      }),
+      prisma.providerSubscription.findFirst({
+        where: { soleProviderId: provider.id, status: "ACTIVE" },
+        include: { package: true },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    if (!selectedPackage) {
+      return res.status(500).json({ success: false, message: "Selected provider plan is not available" });
+    }
+
+    if (currentSubscription?.package.tier === tier) {
+      return res.status(200).json({
+        success: true,
+        subscription: {
+          tier: selectedPackage.tier,
+          status: currentSubscription.status,
+          paymentStatus: currentSubscription.paymentStatus,
+          dailyAppointmentLimit: currentSubscription.dailyAppointmentLimit,
+          monthlyPrice: Number(selectedPackage.monthlyPrice),
+          nextBillingDate: currentSubscription.nextBillingDate,
+        },
+      });
+    }
+
+    const now = new Date();
+    const nextBillingDate = new Date(now);
+    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+    const isPaidPlan = Number(selectedPackage.monthlyPrice) > 0;
+    const isUpgrade =
+      currentSubscription !== null &&
+      Number(selectedPackage.monthlyPrice) > Number(currentSubscription.package.monthlyPrice);
+
+    const subscription = await prisma.$transaction(async (tx) => {
+      if (currentSubscription) {
+        await tx.providerSubscription.update({
+          where: { id: currentSubscription.id },
+          data: { status: "CANCELLED" },
+        });
+      }
+
+      return tx.providerSubscription.create({
+        data: {
+          soleProviderId: provider.id,
+          packageId: selectedPackage.id,
+          status: "ACTIVE",
+          dailyAppointmentLimit: selectedPackage.dailyAppointmentLimit,
+          maxStaff: selectedPackage.maxStaff,
+          billingStartDate: now,
+          nextBillingDate,
+          paymentStatus: isPaidPlan ? "PENDING" : "PAID",
+          upgradedAt: isUpgrade ? now : null,
+        },
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      subscription: {
+        tier: selectedPackage.tier,
+        status: subscription.status,
+        paymentStatus: subscription.paymentStatus,
+        dailyAppointmentLimit: subscription.dailyAppointmentLimit,
+        monthlyPrice: Number(selectedPackage.monthlyPrice),
+        nextBillingDate: subscription.nextBillingDate,
+      },
+    });
+  } catch (error) {
+    console.error("Provider subscription change failed:", error);
+    return res.status(500).json({ success: false, message: "Unable to change provider plan" });
   }
 };
 

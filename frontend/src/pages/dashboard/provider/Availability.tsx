@@ -45,6 +45,7 @@ export default function Availability() {
         if (data && data.schedule) {
           setSchedule(data.schedule);
         }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         console.log("No existing availability found, using defaults.");
       } finally {
@@ -79,6 +80,7 @@ export default function Availability() {
         body: JSON.stringify({ schedule }),
       });
       toast.success("Availability updated successfully!");
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       toast.error("Failed to update availability. Please try again.");
     } finally {
@@ -160,7 +162,9 @@ export default function Availability() {
       </div>
       
       <div className="mt-6 bg-sky-50 border border-sky-100 rounded-xl p-4 flex gap-3 text-sm text-sky-800">
-        <span className="text-lg">💡</span>
+        <span className="text-lg">
+          
+        </span>
         <p>Changes to your availability will immediately affect what customers can see and book on your public profile.</p>
       </div>
 
