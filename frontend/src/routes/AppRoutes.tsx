@@ -1,6 +1,7 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 
 import PublicLayout from "../layouts/PublicLayout";
+import ProviderLayout from "../layouts/ProviderLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleRoute } from "./RoleRoute";
 
@@ -24,13 +25,18 @@ import CustomerRegister from "../pages/public/register/CustomerRegister";
 import ProviderRegister from "../pages/public/register/ProviderRegister";
 import BusinessRegister from "../pages/public/register/BusinessRegister";
 
-// Other Role Dashboards
+// Customer dashboard
 import ClientDashboard from "../pages/dashboard/customer/Dashboard";
-import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
-import StaffDashboard from "../pages/dashboard/staff/Dashboard";
-import AdminDashboard from "../pages/dashboard/admin/Dashboard";
 
-// Business Owner Suite
+// Sole provider dashboard
+import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
+import Services from "../pages/dashboard/provider/Services";
+import Appointments from "../pages/dashboard/provider/Appointments";
+import Availability from "../pages/dashboard/provider/Availability";
+import ProviderProfilePage from "../pages/dashboard/provider/Profile";
+import ProviderPackage from "../pages/dashboard/provider/Package";
+
+// Business owner dashboard
 import BusinessDashboard from "../pages/dashboard/business/Dashboard";
 import BusinessServices from "../pages/dashboard/business/Services";
 import BusinessStaff from "../pages/dashboard/business/Staff";
@@ -42,10 +48,15 @@ import PackageCheckout from "../pages/dashboard/business/PackageCheckout";
 import PackageSuccess from "../pages/dashboard/business/PackageSuccess";
 import BusinessProfilePage from "../pages/dashboard/business/Profile";
 import BusinessAnalytics from "../pages/dashboard/business/Analytics";
+
+// Other dashboards
+import StaffDashboard from "../pages/dashboard/staff/Dashboard";
+import AdminDashboard from "../pages/dashboard/admin/Dashboard";
+
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* 1. Public Pages (shared PublicLayout with Navbar & Footer) */}
+      {/* Public pages */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
@@ -56,18 +67,38 @@ export default function AppRoutes() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
 
-        {/* Directory & Profile */}
+        {/* Provider discovery */}
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderProfile />} />
 
-        {/* Multi-role Registration */}
+        {/* Registration */}
         <Route path="/register" element={<Register />} />
         <Route path="/register/customer" element={<CustomerRegister />} />
         <Route path="/register/provider" element={<ProviderRegister />} />
         <Route path="/register/business" element={<BusinessRegister />} />
       </Route>
 
-      {/* 2. Customer Dashboard */}
+      {/* Sole provider dashboard */}
+      <Route
+        path="/dashboard/provider"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={["SOLE_PROVIDER"]}>
+              <ProviderLayout />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<ProviderDashboard />} />
+        <Route path="services" element={<Services />} />
+        <Route path="appointments" element={<Appointments />} />
+        <Route path="availability" element={<Availability />} />
+        <Route path="availability/edit" element={<Availability editMode />} />
+        <Route path="profile" element={<ProviderProfilePage />} />
+        <Route path="subscription" element={<ProviderPackage />} />
+      </Route>
+
+      {/* Customer dashboard */}
       <Route
         path="/dashboard/customer"
         element={
@@ -79,19 +110,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* 3. Sole Provider Dashboard */}
-      <Route
-        path="/dashboard/provider"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["SOLE_PROVIDER"]}>
-              <ProviderDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* 4. Business Owner Pages */}
+      {/* Business owner dashboard */}
       <Route
         path="/dashboard/business"
         element={
@@ -102,6 +121,8 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Business owner pages */}
       <Route
         path="/dashboard/business/services"
         element={
@@ -112,6 +133,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/staff"
         element={
@@ -122,6 +144,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/staff/:id"
         element={
@@ -132,6 +155,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/appointments"
         element={
@@ -142,6 +166,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/package"
         element={
@@ -152,6 +177,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/analytics"
         element={
@@ -162,7 +188,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* Plan Showcase, Gateway Checkout & Receipt */}
+
       <Route
         path="/dashboard/business/package/plans"
         element={
@@ -173,6 +199,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/package/checkout"
         element={
@@ -183,6 +210,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/dashboard/business/package/success"
         element={
@@ -205,7 +233,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* 5. Business Staff Dashboard */}
+      {/* Business staff dashboard */}
       <Route
         path="/dashboard/staff"
         element={
@@ -217,7 +245,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* 6. Platform Admin Dashboard */}
+      {/* Admin dashboard */}
       <Route
         path="/dashboard/admin"
         element={
@@ -229,7 +257,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* 7. Fallback Route */}
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
