@@ -66,12 +66,8 @@ export default function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-
-        {/* Provider discovery */}
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderProfile />} />
-
-        {/* Registration */}
         <Route path="/register" element={<Register />} />
         <Route path="/register/customer" element={<CustomerRegister />} />
         <Route path="/register/provider" element={<ProviderRegister />} />
@@ -79,6 +75,11 @@ export default function AppRoutes() {
       </Route>
 
       {/* Sole provider dashboard */}
+      {/* --- PROTECTED PROVIDER DASHBOARD ROUTES --- */}
+      {/* 
+        We wrap the entire provider section in the ProtectedRoute and RoleRoute.
+        Then we use ProviderLayout to render the sidebar.
+      */}
       <Route
         path="/dashboard/provider"
         element={
@@ -89,7 +90,11 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
+        
+        {/* Index route for /dashboard/provider (the main Dashboard) */}
         <Route index element={<ProviderDashboard />} />
+        
+        {/* Sub-routes for the provider dashboard */}
         <Route path="services" element={<Services />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="availability" element={<Availability />} />
@@ -99,6 +104,7 @@ export default function AppRoutes() {
       </Route>
 
       {/* Customer dashboard */}
+      {/* --- PROTECTED CUSTOMER DASHBOARD --- */}
       <Route
         path="/dashboard/customer"
         element={
@@ -111,6 +117,7 @@ export default function AppRoutes() {
       />
 
       {/* Business owner dashboard */}
+      {/* --- PROTECTED BUSINESS DASHBOARD --- */}
       <Route
         path="/dashboard/business"
         element={

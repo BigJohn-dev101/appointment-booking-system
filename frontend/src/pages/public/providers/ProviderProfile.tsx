@@ -1,21 +1,34 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-
-import { providers } from "../../../data/providers";
+import { fetchProvider } from "../../../services/providers";
+import type { Provider } from "../../../types/providers";
 
 const SERVICES_PER_PAGE = 6;
 
 export default function ProviderProfile() {
   const { id } = useParams();
-  const [servicePage, setServicePage] = useState(1);
-
-  const provider = providers.find(
-    (provider) => provider.id === Number(id)
-  );
+  const [providerState, setProviderState] = useState<{ id: string; provider: Provider | null; error: string | null }>({ id: "", provider: null, error: null });
+  const [servicePageState, setServicePageState] = useState({ id: "", page: 1 });
+  const isLoading = Boolean(id) && providerState.id !== id;
+  const provider = providerState.id === id ? providerState.provider : null;
+  const loadError = providerState.id === id ? providerState.error : null;
+  const servicePage = servicePageState.id === id ? servicePageState.page : 1;
 
   useEffect(() => {
-    setServicePage(1);
-  }, [provider?.id]);
+    if (!id) return;
+    let active = true;
+    void fetchProvider(id)
+      .then((data) => { if (active) setProviderState({ id, provider: data, error: null }); })
+      .catch((error: unknown) => {
+        console.error("Public provider detail fetch failed:", error);
+        if (active) setProviderState({ id, provider: null, error: error instanceof Error ? error.message : "Unable to load provider." });
+      });
+    return () => { active = false; };
+  }, [id]);
+
+  if (isLoading) {
+    return <section className="min-h-[60vh] bg-[#F8FAFC] py-14"><div className="mx-auto max-w-7xl animate-pulse px-6 lg:px-8" role="status" aria-label="Loading provider"><div className="h-5 w-32 rounded bg-slate-200" /><div className="mt-8 h-28 rounded-2xl bg-white" /><div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-64 rounded-2xl border border-slate-200 bg-white p-6"><div className="h-5 w-1/2 rounded bg-slate-200" /><div className="mt-5 h-12 rounded bg-slate-100" /></div>)}</div></div></section>;
+  }
 
   if (!provider) {
     return (
@@ -27,8 +40,7 @@ export default function ProviderProfile() {
             </h1>
 
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-              The provider you are looking for does not exist or is no longer
-              available.
+              {loadError ? "Provider details could not be loaded. Please try again." : "The provider you are looking for does not exist or is no longer available."}
             </p>
 
             <Link
@@ -183,14 +195,14 @@ export default function ProviderProfile() {
                       </p>
 
                       <p className="mt-1 text-lg font-bold text-[#0EA5E9]">
-                        R{service.price}
+                        {service.price === null ? "Price not set" : `R${service.price}`}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <Link
-                  to={`/providers/${provider.id}/book?service=${service.id}`}
+                  to={`/providers/${encodeURIComponent(provider.id)}/book?service=${encodeURIComponent(service.id)}`}
                   className="mt-6 flex w-full items-center justify-center rounded-xl bg-[#0EA5E9] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(14,165,233,0)] transition-all duration-200 hover:bg-[#38BDF8] hover:shadow-[0_0_20px_-4px_rgba(14,165,233,0.5)]"
                 >
                   Book appointment
@@ -203,7 +215,7 @@ export default function ProviderProfile() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => setServicePage((page) => Math.max(1, page - 1))}
+                onClick={() => setServicePageState({ id: id ?? "", page: Math.max(1, servicePage - 1) })}
                 disabled={servicePage === 1}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -214,7 +226,7 @@ export default function ProviderProfile() {
                 <button
                   key={page}
                   type="button"
-                  onClick={() => setServicePage(page)}
+                  onClick={() => setServicePageState({ id: id ?? "", page })}
                   className={`h-10 w-10 rounded-lg text-sm font-semibold transition-colors ${
                     servicePage === page
                       ? "bg-[#0EA5E9] text-white shadow-[0_4px_14px_-4px_rgba(14,165,233,0.5)]"
@@ -227,7 +239,7 @@ export default function ProviderProfile() {
 
               <button
                 type="button"
-                onClick={() => setServicePage((page) => Math.min(totalServicePages, page + 1))}
+                onClick={() => setServicePageState({ id: id ?? "", page: Math.min(totalServicePages, servicePage + 1) })}
                 disabled={servicePage === totalServicePages}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-40"
               >

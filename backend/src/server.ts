@@ -6,13 +6,23 @@ import authRoutes from "./routes/auth.routes.js";
 import providerRoutes from "./routes/provider.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import customerRoutes from "./routes/customer.routes.js";
+import publicProviderRoutes from "./routes/public-provider.routes.js";
 
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+      const isLocalDevelopmentOrigin =
+        process.env.NODE_ENV !== "production" &&
+        /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin ?? "");
+
+      callback(
+        null,
+        !origin || origin === FRONTEND_ORIGIN || isLocalDevelopmentOrigin,
+      );
+    },
     credentials: true,
   }),
 );
@@ -22,6 +32,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/provider", providerRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/customer", customerRoutes);
+app.use("/api/providers", publicProviderRoutes);
 
 app.get("/api/health", async (_req, res) => {
   try {

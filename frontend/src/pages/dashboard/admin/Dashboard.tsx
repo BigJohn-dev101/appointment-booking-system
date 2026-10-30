@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { useAuth } from "../../../hooks/useAuth";
 
 const ACCENT_FROM = "#0EA5E9";
 const ACCENT_TO = "#38BDF8";
@@ -64,8 +64,8 @@ const signups = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: authUser, loading, logout } = useAuth();
 
-  const [user, setUser] = useState<User | null>(null);
   const [activeItem, setActiveItem] = useState("Dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats] = useState<PlatformStats>({
@@ -75,45 +75,13 @@ export default function AdminDashboard() {
     totalBookingsThisMonth: 0,
   });
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-
-    if (!token || !storedUser) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    try {
-      const parsedUser = JSON.parse(storedUser) as User;
-
-      if (parsedUser.role !== "ADMIN") {
-        toast.error("You do not have permission to access this dashboard.");
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      setUser(parsedUser);
-    } catch (error) {
-      console.error("Unable to read logged-in user:", error);
-
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-
-      navigate("/login", { replace: true });
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
-    toast.success("Logged out successfully.");
-
-    navigate("/login", { replace: true });
+  const handleLogout = async () => {
+    await logout();
   };
 
-  if (!user) {
+  const user = authUser as User | null;
+
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-slate-500">Loading dashboard...</p>
