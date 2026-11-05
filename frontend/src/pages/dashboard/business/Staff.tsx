@@ -7,10 +7,6 @@ import { apiFetch } from "../../../services/api";
 const ACCENT_FROM = "#0EA5E9";
 const ACCENT_TO = "#38BDF8";
 
-// Standardized uniform limits across all plans & staff members
-const UNIFORM_DAILY_APPOINTMENT_LIMIT = 10;
-const UNIFORM_STAFF_SEAT_LIMIT = 10;
-
 // --- Vector Icons ---
 const Icons = {
   Dashboard: () => (
@@ -104,8 +100,7 @@ export type StaffMember = {
   role: string;
   assignedServices?: string[];
   appointmentsToday: number;
-  dailyLimit: number; // Standardized across all staff
-  status: "Active" | "On leave" | "Inactive";
+  status: "Active" | "On leave" | "Inactive" | "Pending";
 };
 
 type ServiceItem = {
@@ -131,7 +126,7 @@ type RawApiStaff = {
   email?: string;
   phone?: string;
   assignedServices?: string[];
-  dailyLimit?: number;
+  expiresAt?: string;
 };
 
 type NavItem = {
@@ -180,52 +175,16 @@ const DEFAULT_SERVICES: ServiceItem[] = [
   { id: "svc-3", name: "Haircut & Beard Combo", durationMinutes: 50, expectedPrice: 250, active: true },
 ];
 
-// Unified default staff with the same standardized limit (10 bookings/day)
-const DEFAULT_STAFF: StaffMember[] = [
-  {
-    id: "staff-1",
-    name: "Dr. Rachel Green",
-    email: "rachel@apexwellness.co.za",
-    phone: "+27 82 111 2233",
-    role: "Lead Chiropractor",
-    assignedServices: ["Standard Haircut", "Haircut & Beard Combo"],
-    appointmentsToday: 8,
-    dailyLimit: UNIFORM_DAILY_APPOINTMENT_LIMIT,
-    status: "Active",
-  },
-  {
-    id: "staff-2",
-    name: "Dr. Alex Carter",
-    email: "alex@apexwellness.co.za",
-    phone: "+27 83 444 5566",
-    role: "Physiotherapist",
-    assignedServices: ["Beard Sculpt & Trim"],
-    appointmentsToday: 6,
-    dailyLimit: UNIFORM_DAILY_APPOINTMENT_LIMIT,
-    status: "Active",
-  },
-  {
-    id: "staff-3",
-    name: "Dr. Jane Wilson",
-    email: "jane@apexwellness.co.za",
-    phone: "+27 84 777 8899",
-    role: "Yoga & Posture Instructor",
-    assignedServices: ["Standard Haircut"],
-    appointmentsToday: 5,
-    dailyLimit: UNIFORM_DAILY_APPOINTMENT_LIMIT,
-    status: "Active",
-  },
-];
-
 export default function BusinessStaff() {
   const navigate = useNavigate();
   const { user, loading, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [staffList, setStaffList] = useState<StaffMember[]>(DEFAULT_STAFF);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
+  const [maxStaff, setMaxStaff] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [fetching, setFetching] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   // Add Staff Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -233,6 +192,8 @@ export default function BusinessStaff() {
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formRole, setFormRole] = useState("");
+  const [formServiceIds, setFormServiceIds] = useState<string[]>([]);
+  const [inviteServicesOpen, setInviteServicesOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calendar & Manage Modal State
@@ -258,30 +219,23 @@ export default function BusinessStaff() {
           apiFetch<{
             success: boolean;
             staff?: RawApiStaff[];
-          }>("/business/dashboard").catch(() => null),
+            maxStaff: number | null;
+          }>("/business/staff"),
           apiFetch<{ success: boolean; services: ServiceItem[] }>("/business/services").catch(() => null),
         ]);
 
-        if (dashRes?.staff && dashRes.staff.length > 0) {
-          setStaffList(
-            dashRes.staff.map((s) => ({
-              ...s,
-              dailyLimit: UNIFORM_DAILY_APPOINTMENT_LIMIT, // Ensure uniform limit
-              status:
-                s.status === "Available" || s.status === "Active"
-                  ? "Active"
-                  : s.status === "On leave"
-                  ? "On leave"
-                  : "Inactive",
-            }))
-          );
-        }
+        setStaffList((dashRes.staff ?? []).map((staff) => ({
+          ...staff,
+          status: staff.status === "Pending" ? "Pending" : "Active",
+        })));
+        setMaxStaff(dashRes.maxStaff);
 
         if (svcRes?.services && svcRes.services.length > 0) {
           setServices(svcRes.services);
         }
       } catch (err) {
         console.warn("Could not load staff data:", err);
+        toast.error(err instanceof Error ? err.message : "Could not load staff data.");
       } finally {
         setFetching(false);
       }
@@ -290,17 +244,19 @@ export default function BusinessStaff() {
     void fetchAllData();
   }, [user, navigate]);
 
-  const atStaffLimit = staffList.length >= UNIFORM_STAFF_SEAT_LIMIT;
+  const atStaffLimit = maxStaff !== null && staffList.length >= maxStaff;
 
   const handleOpenAdd = () => {
     if (atStaffLimit) {
-      toast.error(`Staff limit of ${UNIFORM_STAFF_SEAT_LIMIT} reached.`);
+      toast.error(`Your plan's limit of ${maxStaff} staff seats has been reached.`);
       return;
     }
     setFormName("");
     setFormEmail("");
     setFormPhone("");
     setFormRole("");
+    setFormServiceIds([]);
+    setInviteServicesOpen(false);
     setIsAddModalOpen(true);
   };
 
@@ -314,29 +270,34 @@ export default function BusinessStaff() {
 
     setIsSubmitting(true);
 
-    const newStaff: StaffMember = {
-      id: `staff-${Date.now()}`,
-      name: formName.trim(),
-      email: formEmail.trim().toLowerCase(),
-      phone: formPhone.trim() || "+27 82 000 0000",
-      role: formRole.trim(),
-      assignedServices: [],
-      appointmentsToday: 0,
-      dailyLimit: UNIFORM_DAILY_APPOINTMENT_LIMIT,
-      status: "Active",
-    };
-
     try {
-      await apiFetch("/business/staff", {
+      const response = await apiFetch<{
+        success: boolean;
+        invitation: { id: string; name: string; email: string; role: string; expiresAt: string; assignedServices?: string[] };
+      }>("/business/staff/invitations", {
         method: "POST",
-        body: JSON.stringify(newStaff),
-      }).catch(() => {});
+        body: JSON.stringify({
+          fullName: formName.trim(),
+          email: formEmail.trim().toLowerCase(),
+          phone: formPhone.trim() || undefined,
+          title: formRole.trim(),
+          serviceIds: formServiceIds,
+        }),
+      });
 
-      setStaffList((prev) => [newStaff, ...prev]);
-      toast.success(`${newStaff.name} added to the team.`);
+      setStaffList((prev) => [{
+        id: response.invitation.id,
+        name: response.invitation.name,
+        email: response.invitation.email,
+        role: response.invitation.role,
+        assignedServices: response.invitation.assignedServices ?? [],
+        appointmentsToday: 0,
+        status: "Pending",
+      }, ...prev]);
+      toast.success(`Invitation sent to ${response.invitation.email}.`);
       setIsAddModalOpen(false);
-    } catch {
-      toast.error("Failed to add staff member.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send staff invitation.");
     } finally {
       setIsSubmitting(false);
     }
@@ -435,11 +396,11 @@ export default function BusinessStaff() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -535,14 +496,14 @@ export default function BusinessStaff() {
                 Staff Members
               </h1>
               <p className="hidden text-xs text-slate-500 sm:block">
-                Standardized quota: {UNIFORM_DAILY_APPOINTMENT_LIMIT} daily bookings per provider • {staffList.length} of {UNIFORM_STAFF_SEAT_LIMIT} seats filled
+                {staffList.length} of {maxStaff ?? "unlimited"} staff seats used, including pending invitations
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              Unified Limit: {UNIFORM_DAILY_APPOINTMENT_LIMIT} Bookings/Staff
+              {maxStaff === null ? "No staff seat limit" : `${maxStaff} staff seats`}
             </span>
           </div>
         </header>
@@ -574,7 +535,7 @@ export default function BusinessStaff() {
               }`}
             >
               <Icons.Plus />
-              <span>Add Staff Member</span>
+              <span>Invite Staff Member</span>
             </button>
           </section>
 
@@ -586,7 +547,7 @@ export default function BusinessStaff() {
                   <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-400">
                     <th className="px-6 py-4">Name</th>
                     <th className="px-6 py-4">Role / Title</th>
-                    <th className="px-6 py-4">Daily Quota (Same Limit)</th>
+                    <th className="px-6 py-4">Appointments Today</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Schedule &amp; Services</th>
                   </tr>
@@ -657,24 +618,10 @@ export default function BusinessStaff() {
                           </p>
                         </td>
 
-                        {/* Standardized Same Limit Across All Staff */}
+                        {/* Today's appointment count */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-800">{staff.appointmentsToday}</span>
-                            <span className="text-xs font-semibold text-slate-400">
-                              / {UNIFORM_DAILY_APPOINTMENT_LIMIT} daily bookings
-                            </span>
-                          </div>
-                          <div className="mt-1 h-1.5 w-28 rounded-full bg-slate-100">
-                            <div
-                              className="h-1.5 rounded-full bg-[#0EA5E9]"
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  (staff.appointmentsToday / UNIFORM_DAILY_APPOINTMENT_LIMIT) * 100
-                                )}%`,
-                              }}
-                            />
                           </div>
                         </td>
 
@@ -684,6 +631,8 @@ export default function BusinessStaff() {
                             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
                               staff.status === "Active"
                                 ? "bg-emerald-50 text-emerald-700"
+                                : staff.status === "Pending"
+                                ? "bg-sky-50 text-sky-700"
                                 : staff.status === "On leave"
                                 ? "bg-amber-50 text-amber-700"
                                 : "bg-slate-100 text-slate-500"
@@ -693,6 +642,8 @@ export default function BusinessStaff() {
                               className={`h-1.5 w-1.5 rounded-full ${
                                 staff.status === "Active"
                                   ? "bg-emerald-500"
+                                  : staff.status === "Pending"
+                                  ? "bg-sky-500"
                                   : staff.status === "On leave"
                                   ? "bg-amber-500"
                                   : "bg-slate-400"
@@ -707,10 +658,10 @@ export default function BusinessStaff() {
                           <button
                             type="button"
                             onClick={() => handleOpenCalendarAndManage(staff)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-[#0EA5E9] hover:text-[#0EA5E9]"
+                            disabled={staff.status === "Pending"}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-[#0EA5E9] hover:text-[#0EA5E9] disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <Icons.CalendarGrid />
-                            <span>View Calendar &amp; Schedule</span>
+                            {staff.status === "Pending" ? <span>Invitation pending</span> : <><Icons.CalendarGrid /><span>View Calendar &amp; Schedule</span></>}
                           </button>
                         </td>
                       </tr>
@@ -740,9 +691,9 @@ export default function BusinessStaff() {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Add Staff Member</h3>
+                <h3 className="text-xl font-bold text-slate-900">Invite Staff Member</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Seat {staffList.length + 1} of {UNIFORM_STAFF_SEAT_LIMIT} available. Standard limit: {UNIFORM_DAILY_APPOINTMENT_LIMIT} bookings/day.
+                  The invite link expires in 7 days. The staff member sets their own password.
                 </p>
               </div>
               <button
@@ -809,6 +760,63 @@ export default function BusinessStaff() {
                 />
               </div>
 
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Assign services
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">{formServiceIds.length} selected</span>
+                </div>
+                {services.length === 0 ? (
+                  <p className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    No services are available yet. You can assign services later from the service editor.
+                  </p>
+                ) : services.length === 1 ? (
+                  <label className="mt-1.5 flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={formServiceIds.includes(services[0]!.id)}
+                      onChange={() => setFormServiceIds((current) => current.includes(services[0]!.id) ? [] : [services[0]!.id])}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                    />
+                    <span className="font-medium text-slate-800">{services[0]!.name}</span>
+                  </label>
+                ) : (
+                  <div className="relative mt-1.5">
+                    <button
+                      type="button"
+                      aria-expanded={inviteServicesOpen}
+                      onClick={() => setInviteServicesOpen((open) => !open)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-left text-sm text-slate-800 hover:border-[#0EA5E9]"
+                    >
+                      <span className="truncate">
+                        {formServiceIds.length === 0
+                          ? "Select services for this staff member"
+                          : services.filter((service) => formServiceIds.includes(service.id)).map((service) => service.name).join(", ")}
+                      </span>
+                      <span aria-hidden="true" className="ml-3 text-slate-500">{inviteServicesOpen ? "▴" : "▾"}</span>
+                    </button>
+                    {inviteServicesOpen && (
+                      <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-36 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                        {services.map((service) => (
+                          <label key={service.id} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-slate-50">
+                            <input
+                              type="checkbox"
+                              checked={formServiceIds.includes(service.id)}
+                              onChange={() => setFormServiceIds((current) => current.includes(service.id)
+                                ? current.filter((id) => id !== service.id)
+                                : [...current, service.id])}
+                              className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                            />
+                            <span className="font-medium text-slate-800">{service.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
@@ -823,7 +831,7 @@ export default function BusinessStaff() {
                   disabled={isSubmitting}
                   className="rounded-xl bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-105 disabled:opacity-50"
                 >
-                  {isSubmitting ? "Adding..." : "Add to Team"}
+                  {isSubmitting ? "Sending invitation..." : "Send invitation"}
                 </button>
               </div>
             </form>
@@ -853,7 +861,7 @@ export default function BusinessStaff() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    {managingStaff.role} • Limit: {UNIFORM_DAILY_APPOINTMENT_LIMIT} bookings/day
+                    {managingStaff.role} • {managingStaff.appointmentsToday} appointments today
                   </p>
                 </div>
               </div>
@@ -908,7 +916,7 @@ export default function BusinessStaff() {
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Week View:</span>
                     <span className="text-sm font-bold text-slate-800">Monday – Saturday</span>
                     <span className="rounded-lg bg-sky-50 px-2 py-0.5 text-xs font-semibold text-[#0EA5E9]">
-                      {managingStaff.appointmentsToday} of {UNIFORM_DAILY_APPOINTMENT_LIMIT} Booked Today
+                      {managingStaff.appointmentsToday} booked today
                     </span>
                   </div>
 

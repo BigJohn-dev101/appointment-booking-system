@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { apiFetch } from "../services/api";
+import { BusinessDashboardProvider, type BusinessDashboardResponse } from "../context/BusinessDashboardContext";
+import { formatBusinessName } from "../lib/formatBusinessName";
 
 const ACCENT_FROM = "#0EA5E9";
 const ACCENT_TO = "#38BDF8";
@@ -18,7 +21,7 @@ const navItems: NavItem[] = [
   { label: "Staff", icon: "♙", path: "/dashboard/business/staff" },
   { label: "Subscription", icon: "◇", path: "/dashboard/business/package" },
   { label: "Analytics", icon: "↗", path: "/dashboard/business/analytics" },
-  { label: "Profile", icon: "⚙", path: "/dashboard/business/profile" },
+  { label: "Settings", icon: "⚙", path: "/dashboard/business/profile" },
 ];
 
 export default function BusinessLayout() {
@@ -26,11 +29,51 @@ export default function BusinessLayout() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardData, setDashboardData] = useState<BusinessDashboardResponse | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-  const businessName = (user?.business as { name?: string } | undefined)?.name ?? "My Business";
+  const businessName = formatBusinessName((user?.business as { name?: string } | undefined)?.name) || "My Business";
+  const userId = user?.id;
+  const routeTitles: Array<[string, string]> = [
+    ["/dashboard/business/appointments", "Appointments"],
+    ["/dashboard/business/services", "Services"],
+    ["/dashboard/business/staff/", "Staff Details"],
+    ["/dashboard/business/staff", "Staff"],
+    ["/dashboard/business/package/plans", "Upgrade Plans"],
+    ["/dashboard/business/package/checkout", "Checkout"],
+    ["/dashboard/business/package/success", "Subscription Complete"],
+    ["/dashboard/business/package", "Subscription"],
+    ["/dashboard/business/analytics", "Analytics"],
+    ["/dashboard/business/profile", "Settings"],
+  ];
+  const pageTitle = routeTitles.find(([path]) =>
+    path.endsWith("/") ? location.pathname.startsWith(path) : location.pathname === path,
+  )?.[1] ?? "Overview";
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+
+    void apiFetch<BusinessDashboardResponse>("/business/dashboard")
+      .then((response) => {
+        if (active) setDashboardData(response);
+      })
+      .catch((error: unknown) => {
+        if (active) setDashboardError(error instanceof Error ? error.message : "Unable to load business overview.");
+      })
+      .finally(() => {
+        if (active) setDashboardLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <BusinessDashboardProvider value={{ data: dashboardData, loading: dashboardLoading, error: dashboardError }}>
+    <div className="business-layout min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
@@ -41,11 +84,11 @@ export default function BusinessLayout() {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0B1220] transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-64 flex-col bg-[#0B1220] transition-transform duration-200 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="flex h-20 items-center border-b border-white/10 px-6">
+        <div className="flex h-24 items-center border-b border-white/10 px-6 pt-4">
           <Link to="/" className="flex items-center gap-3">
             <div
               className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-[#0F172A]"
@@ -69,9 +112,11 @@ export default function BusinessLayout() {
           <p className="mt-1 text-xs text-sky-400">Business Owner</p>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 pb-6 pt-6">
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-hidden px-3 py-3">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = item.path === "/dashboard/business"
+              ? location.pathname === item.path
+              : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
               <button
                 key={item.label}
@@ -79,7 +124,7 @@ export default function BusinessLayout() {
                   setMobileMenuOpen(false);
                   navigate(item.path);
                 }}
-                className={`relative flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition ${
+                className={`relative flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-sm font-medium transition ${
                   isActive
                     ? "bg-white/10 text-white"
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
@@ -100,7 +145,7 @@ export default function BusinessLayout() {
           })}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
+        <div className="mt-auto shrink-0 border-t border-white/10 p-4">
           <button
             onClick={() => void logout()}
             className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400"
@@ -126,13 +171,12 @@ export default function BusinessLayout() {
               </svg>
             </button>
 
+            <span aria-hidden="true" className="h-9 w-1 rounded-full bg-sky-500" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                Business Management
+              <p className="text-[10px] font-bold uppercase text-sky-700">Business console</p>
+              <h1 className="font-[Clash_Display] text-2xl font-bold text-slate-950 sm:text-[28px]">
+                {pageTitle}
               </h1>
-              <p className="hidden text-xs text-slate-500 sm:block">
-                Manage services, staff calendars, and customer bookings.
-              </p>
             </div>
           </div>
 
@@ -152,10 +196,11 @@ export default function BusinessLayout() {
         </header>
 
         {/* Child Pages Render Inside Outlet */}
-        <main>
+        <main className="business-page-content">
           <Outlet />
         </main>
       </div>
     </div>
+    </BusinessDashboardProvider>
   );
 }

@@ -1,6 +1,8 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import prisma from "../lib/prisma.js";
+import { BookingError, resolveBookingAvailability } from "../services/booking.service.js";
+import { timeRangesOverlap } from "../services/availability.service.js";
 
 export const getCustomerDashboard = async (
   req: AuthenticatedRequest,
@@ -133,5 +135,111 @@ export const getCustomerAppointments = async (req: AuthenticatedRequest, res: Re
   } catch (error) {
     console.error("Customer appointments error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong while loading your appointments" });
+  }
+};
+
+export const createCustomerAppointment = async (req: AuthenticatedRequest, res: Response) => {
+  const body = req.body as Record<string, unknown>;
+  const providerId = typeof body?.providerId === "string" ? body.providerId : "";
+  const serviceId = typeof body?.serviceId === "string" ? body.serviceId : "";
+  const startsAtValue = typeof body?.startsAt === "string" ? body.startsAt : "";
+  const staffId = typeof body?.staffId === "string" ? body.staffId : undefined;
+  const separator = providerId.indexOf(":");
+  const providerKind = providerId.slice(0, separator);
+  const id = providerId.slice(separator + 1);
+
+  if (!id || (providerKind !== "sole" && providerKind !== "business") || !serviceId || !startsAtValue) {
+    return res.status(400).json({ success: false, message: "Provider, service, and appointment time are required" });
+  }
+  if ((providerKind === "business" && !staffId) || (providerKind === "sole" && staffId)) {
+    return res.status(400).json({ success: false, message: "Choose a valid provider for this appointment" });
+  }
+
+  const startsAt = new Date(startsAtValue);
+  if (!Number.isFinite(startsAt.getTime())) {
+    return res.status(400).json({ success: false, message: "Choose a valid appointment time" });
+  }
+  const date = `${startsAt.getFullYear()}-${String(startsAt.getMonth() + 1).padStart(2, "0")}-${String(startsAt.getDate()).padStart(2, "0")}`;
+
+  try {
+    const appointment = await prisma.$transaction(async (transaction) => {
+      const availability = await resolveBookingAvailability(transaction, {
+        providerKind,
+        providerId: id,
+        serviceId,
+        date,
+        ...(staffId ? { staffId } : {}),
+      });
+      const slot = availability.slots.find((candidate) => new Date(candidate.startsAt).getTime() === startsAt.getTime());
+      if (!slot || slot.status !== "AVAILABLE") {
+        throw new BookingError("That time is no longer available. Choose another slot.", 409);
+      }
+
+      const requestedEnd = new Date(startsAt.getTime() + availability.service.durationMinutes * 60_000);
+      const existingAppointments = await transaction.appointment.findMany({
+        where: {
+          customerId: req.user!.userId,
+          status: { in: ["CONFIRMED", "RESCHEDULED"] },
+          scheduledStart: {
+            gte: new Date(startsAt.getTime() - 24 * 60 * 60 * 1000),
+            lt: requestedEnd,
+          },
+        },
+        include: { service: { select: { durationMinutes: true } } },
+      });
+      const hasOverlappingCustomerBooking = existingAppointments.some((existing) =>
+        timeRangesOverlap(
+          startsAt,
+          availability.service.durationMinutes,
+          existing.scheduledStart,
+          existing.service.durationMinutes,
+        ),
+      );
+      if (hasOverlappingCustomerBooking) {
+        throw new BookingError(
+          "You already have another active booking during this time. Please choose another time.",
+          409,
+        );
+      }
+
+      return transaction.appointment.create({
+        data: {
+          customerId: req.user!.userId,
+          serviceId,
+          scheduledStart: startsAt,
+          ...(providerKind === "sole"
+            ? { soleProviderId: id }
+            : { businessId: id, staffId: staffId! }),
+        },
+        include: { service: { select: { name: true, durationMinutes: true } } },
+      });
+    }, {
+      isolationLevel: "Serializable",
+      maxWait: 15_000,
+      timeout: 20_000,
+    });
+
+    return res.status(201).json({
+      success: true,
+      appointment: {
+        id: appointment.id,
+        service: appointment.service.name,
+        durationMinutes: appointment.service.durationMinutes,
+        startsAt: appointment.scheduledStart,
+        status: appointment.status,
+      },
+    });
+  } catch (error) {
+    if (error instanceof BookingError) {
+      return res.status(error.status).json({ success: false, message: error.message });
+    }
+    if (error && typeof error === "object" && "code" in error && error.code === "P2034") {
+      return res.status(409).json({ success: false, message: "That time was just booked. Choose another slot." });
+    }
+    if (error && typeof error === "object" && "code" in error && error.code === "P2028") {
+      return res.status(503).json({ success: false, message: "The booking service is busy. Please try again." });
+    }
+    console.error("Customer appointment creation error:", error);
+    return res.status(500).json({ success: false, message: "Unable to create appointment" });
   }
 };

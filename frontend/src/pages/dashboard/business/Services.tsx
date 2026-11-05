@@ -95,7 +95,10 @@ export type BusinessService = {
   durationMinutes: number;
   expectedPrice: number | string | null;
   active: boolean;
+  assignedStaffIds: string[];
 };
+
+type AssignableStaff = { id: string; name: string; status: string };
 
 type NavItem = {
   label: string;
@@ -119,6 +122,7 @@ export default function BusinessServices() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [services, setServices] = useState<BusinessService[]>([]);
+  const [staffOptions, setStaffOptions] = useState<AssignableStaff[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [fetching, setFetching] = useState(true);
@@ -133,7 +137,8 @@ export default function BusinessServices() {
   const [formDescription, setFormDescription] = useState("");
   const [formDuration, setFormDuration] = useState(30);
   const [formPrice, setFormPrice] = useState("");
-  const [formActive, setFormActive] = useState(true);
+  const [formStaffIds, setFormStaffIds] = useState<string[]>([]);
+  const [staffSelectOpen, setStaffSelectOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -146,14 +151,15 @@ export default function BusinessServices() {
     const fetchServices = async () => {
       setFetching(true);
       try {
-        const response = await apiFetch<{ success: boolean; services: BusinessService[] }>(
-          "/business/services"
-        );
-        if (response.services) {
-          setServices(response.services);
-        }
+          const [serviceResponse, staffResponse] = await Promise.all([
+            apiFetch<{ success: boolean; services: BusinessService[] }>("/business/services"),
+            apiFetch<{ success: boolean; staff: AssignableStaff[] }>("/business/staff"),
+          ]);
+          setServices(serviceResponse.services ?? []);
+          setStaffOptions((staffResponse.staff ?? []).filter((staff) => staff.status === "Active"));
       } catch (error) {
         console.warn("Could not load services from backend:", error);
+          toast.error(error instanceof Error ? error.message : "Could not load business services.");
       } finally {
         setFetching(false);
       }
@@ -168,7 +174,8 @@ export default function BusinessServices() {
     setFormDescription("");
     setFormDuration(30);
     setFormPrice("");
-    setFormActive(true);
+    setFormStaffIds(staffOptions.length === 1 ? [staffOptions[0]!.id] : []);
+    setStaffSelectOpen(false);
     setIsModalOpen(true);
   };
 
@@ -178,7 +185,8 @@ export default function BusinessServices() {
     setFormDescription(svc.description ?? "");
     setFormDuration(svc.durationMinutes);
     setFormPrice(svc.expectedPrice ? String(svc.expectedPrice) : "");
-    setFormActive(svc.active);
+    setFormStaffIds(svc.assignedStaffIds ?? []);
+    setStaffSelectOpen(false);
     setIsModalOpen(true);
   };
 
@@ -202,34 +210,33 @@ export default function BusinessServices() {
       description: formDescription.trim() || null,
       durationMinutes: Number(formDuration),
       expectedPrice: formPrice.trim() ? Number(formPrice) : null,
-      active: formActive,
+      staffIds: formStaffIds,
     };
 
     try {
       if (editingService) {
-        await apiFetch(`/business/services/${editingService.id}`, {
+        const response = await apiFetch<{ success: boolean; service: BusinessService }>(`/business/services/${editingService.id}`, {
           method: "PUT",
           body: JSON.stringify(payload),
-        }).catch(() => {});
+        });
 
         setServices((prev) =>
-          prev.map((s) => (s.id === editingService.id ? { ...s, ...payload } : s))
+          prev.map((s) => (s.id === editingService.id ? response.service : s))
         );
         toast.success(`"${payload.name}" updated successfully.`);
       } else {
-        const newId = `svc-${Date.now()}`;
-        await apiFetch(`/business/services`, {
+        const response = await apiFetch<{ success: boolean; service: BusinessService }>("/business/services", {
           method: "POST",
           body: JSON.stringify(payload),
-        }).catch(() => {});
+        });
 
-        setServices((prev) => [{ id: newId, ...payload }, ...prev]);
+        setServices((prev) => [response.service, ...prev]);
         toast.success(`"${payload.name}" added to catalog.`);
       }
 
       setIsModalOpen(false);
-    } catch {
-      toast.error("Failed to save service.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save service.");
     } finally {
       setIsSubmitting(false);
     }
@@ -237,11 +244,15 @@ export default function BusinessServices() {
 
   const handleToggleActive = async (service: BusinessService) => {
     const updatedStatus = !service.active;
+    if (updatedStatus && service.assignedStaffIds.length === 0) {
+      toast.error("Assign at least one staff member before activating this service.");
+      return;
+    }
     try {
       await apiFetch(`/business/services/${service.id}/toggle`, {
         method: "PATCH",
         body: JSON.stringify({ active: updatedStatus }),
-      }).catch(() => {});
+      });
 
       setServices((prev) =>
         prev.map((s) => (s.id === service.id ? { ...s, active: updatedStatus } : s))
@@ -250,8 +261,8 @@ export default function BusinessServices() {
       toast.success(
         `"${service.name}" is now ${updatedStatus ? "Active (Bookable)" : "Paused (Hidden)"}.`
       );
-    } catch {
-      toast.error("Could not change status.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not change status.");
     }
   };
 
@@ -280,11 +291,11 @@ export default function BusinessServices() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -611,7 +622,7 @@ export default function BusinessServices() {
       {/* Add / Edit Service Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-7">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
@@ -692,17 +703,63 @@ export default function BusinessServices() {
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-1">
-                <input
-                  type="checkbox"
-                  id="activeCheck"
-                  checked={formActive}
-                  onChange={(e) => setFormActive(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
-                />
-                <label htmlFor="activeCheck" className="text-xs font-medium text-slate-700">
-                  Allow customers to book this service immediately
-                </label>
+              <div>
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-700">Assign staff</p>
+                    <p className="mt-1 text-xs text-slate-500">A service becomes bookable when at least one staff member is assigned.</p>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500">{formStaffIds.length} selected</span>
+                </div>
+                {staffOptions.length === 0 ? (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    No active staff members are available. Add staff first; this service will remain inactive until assigned.
+                  </p>
+                ) : staffOptions.length === 1 ? (
+                  <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={formStaffIds.includes(staffOptions[0]!.id)}
+                      onChange={() => setFormStaffIds((current) => current.includes(staffOptions[0]!.id) ? [] : [staffOptions[0]!.id])}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                    />
+                    <span className="font-medium text-slate-800">{staffOptions[0]!.name}</span>
+                    {formStaffIds.includes(staffOptions[0]!.id) && <span className="ml-auto text-xs font-medium text-emerald-700">Assigned</span>}
+                  </label>
+                ) : (
+                  <div className="relative mt-3">
+                    <button
+                      type="button"
+                      aria-expanded={staffSelectOpen}
+                      onClick={() => setStaffSelectOpen((open) => !open)}
+                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-800 hover:border-sky-400"
+                    >
+                      <span className="truncate">
+                        {formStaffIds.length === 0
+                          ? "Select staff members"
+                          : staffOptions.filter((staff) => formStaffIds.includes(staff.id)).map((staff) => staff.name).join(", ")}
+                      </span>
+                      <span aria-hidden="true" className="ml-3 text-slate-500">{staffSelectOpen ? "▴" : "▾"}</span>
+                    </button>
+                    {staffSelectOpen && (
+                      <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                        {staffOptions.map((staff) => (
+                          <label key={staff.id} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-slate-50">
+                            <input
+                              type="checkbox"
+                              checked={formStaffIds.includes(staff.id)}
+                              onChange={() => setFormStaffIds((current) => current.includes(staff.id)
+                                ? current.filter((id) => id !== staff.id)
+                                : [...current, staff.id])}
+                              className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                            />
+                            <span className="font-medium text-slate-800">{staff.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">

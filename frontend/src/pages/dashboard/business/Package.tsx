@@ -223,11 +223,11 @@ export default function BusinessPackage() {
   const cannotDowngrade = activeStaffCount > 3;
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}

@@ -2,9 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../hooks/useAuth";
 
-const ACCENT_FROM = "#0EA5E9";
-const ACCENT_TO = "#38BDF8";
-
 type PlanTier = {
   id: "basic" | "growth" | "enterprise";
   name: string;

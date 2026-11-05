@@ -1,23 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { useAuth } from "../../../hooks/useAuth";
+import type { AuthUser } from "../../../context/AuthContext";
+import { formatBusinessName } from "../../../lib/formatBusinessName";
 
 const ACCENT_FROM = "#0EA5E9";
 const ACCENT_TO = "#38BDF8";
-
-type User = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName?: string | null;
-  phone?: string | null;
-  role: string;
-  businessStaff?: {
-    business: {
-      name: string;
-    } | null;
-  } | null;
-};
 
 type StaffStats = {
   todayAppointments: number;
@@ -61,8 +49,10 @@ const appointments = [
 
 export default function StaffDashboard() {
   const navigate = useNavigate();
-
-  const [user, setUser] = useState<User | null>(null);
+  const { user: authUser, loading, logout } = useAuth();
+  const user = authUser as (AuthUser & {
+    businessStaff?: { business: { name: string } | null } | null;
+  }) | null;
   const [activeItem, setActiveItem] = useState("Dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats] = useState<StaffStats>({
@@ -72,57 +62,24 @@ export default function StaffDashboard() {
     cancelledAppointments: 0,
   });
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-
-    if (!token || !storedUser) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    try {
-      const parsedUser = JSON.parse(storedUser) as User;
-
-      if (parsedUser.role !== "BUSINESS_STAFF") {
-        toast.error("You do not have permission to access this dashboard.");
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      setUser(parsedUser);
-    } catch (error) {
-      console.error("Unable to read logged-in user:", error);
-
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-
-      navigate("/login", { replace: true });
-    }
-  }, [navigate]);
-
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
-    toast.success("Logged out successfully.");
-
-    navigate("/login", { replace: true });
+    void logout();
   };
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
         <p className="text-sm text-slate-500">Loading dashboard...</p>
       </div>
     );
   }
+  if (!user) return null;
 
   const fullName = `${user.firstName} ${user.lastName ?? ""}`.trim();
   const initials = `${user.firstName.charAt(0)}${
     user.lastName ? user.lastName.charAt(0) : ""
   }`.toUpperCase();
-  const businessName = user.businessStaff?.business?.name ?? "Your business";
+  const businessName = formatBusinessName(user.businessStaff?.business?.name) || "Your business";
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-slate-900">

@@ -57,3 +57,21 @@ button {
 a {
   text-decoration: none;
 }
+
+.business-page-content > .business-legacy-page {
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+.business-page-content > .business-legacy-page > aside,
+.business-page-content > .business-legacy-page > .business-mobile-overlay {
+  display: none !important;
+}
+
+.business-page-content > .business-legacy-page > main {
+  padding-left: 0 !important;
+}
+
+.business-page-content > .business-legacy-page > main > header {
+  display: none !important;
+}

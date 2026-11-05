@@ -62,8 +62,10 @@ model Business {
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   appointments  Appointment[]
+  availability   BusinessAvailability[]
   owner         User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   staff         BusinessStaff[]
+  staffInvitations StaffInvitation[]
   subscriptions ProviderSubscription[]
   services      Service[]
 }
@@ -72,6 +74,7 @@ model BusinessStaff {
   id           String         @id @default(uuid())
   businessId   String
   userId       String         @unique
+  title        String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   appointments Appointment[]
@@ -79,6 +82,40 @@ model BusinessStaff {
   business     Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   services     StaffService[]
+}
+
+model BusinessAvailability {
+  id         String   @id @default(uuid())
+  businessId String
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, dayOfWeek])
+  @@index([dayOfWeek])
+}
+
+model StaffInvitation {
+  id         String    @id @default(uuid())
+  businessId String
+  email      String
+  firstName  String
+  lastName   String?
+  phone      String?
+  title      String?
+  serviceIds String[]  @default([])
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, acceptedAt, expiresAt])
+  @@index([email])
 }
 
 model Package {

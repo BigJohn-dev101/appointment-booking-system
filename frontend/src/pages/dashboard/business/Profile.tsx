@@ -84,8 +84,31 @@ type BusinessProfile = {
   phone: string;
   address: string;
   description: string;
-  operatingHours: string;
 };
+
+type BusinessAvailability = {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  active: boolean;
+};
+
+const WEEKDAYS = [
+  { dayOfWeek: 1, label: "Monday" },
+  { dayOfWeek: 2, label: "Tuesday" },
+  { dayOfWeek: 3, label: "Wednesday" },
+  { dayOfWeek: 4, label: "Thursday" },
+  { dayOfWeek: 5, label: "Friday" },
+  { dayOfWeek: 6, label: "Saturday" },
+  { dayOfWeek: 0, label: "Sunday" },
+];
+
+const DEFAULT_AVAILABILITY: BusinessAvailability[] = WEEKDAYS.map(({ dayOfWeek }) => ({
+  dayOfWeek,
+  startTime: "09:00",
+  endTime: "17:00",
+  active: false,
+}));
 
 type NavItem = {
   label: string;
@@ -100,7 +123,7 @@ const navItems: NavItem[] = [
   { label: "Services", icon: Icons.Services, path: "/dashboard/business/services" },
   { label: "Staff", icon: Icons.Staff, path: "/dashboard/business/staff" },
   { label: "Subscription", icon: Icons.Subscription, path: "/dashboard/business/package" },
-  { label: "Profile", icon: Icons.Profile, path: "/dashboard/business/profile" },
+  { label: "Settings", icon: Icons.Profile, path: "/dashboard/business/profile" },
 ];
 
 const CATEGORIES = [
@@ -123,7 +146,6 @@ const DEFAULT_PROFILE: BusinessProfile = {
   address: "14 Church Street, Hatfield, Pretoria",
   description:
     "Multidisciplinary wellness clinic offering registered chiropractic adjustments, physiotherapy rehabilitation, and posture guidance.",
-  operatingHours: "08:00 – 17:00 (Mon – Sat)",
 };
 
 export default function BusinessProfilePage() {
@@ -134,6 +156,8 @@ export default function BusinessProfilePage() {
   const [profile, setProfile] = useState<BusinessProfile>(DEFAULT_PROFILE);
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [availability, setAvailability] = useState<BusinessAvailability[]>(DEFAULT_AVAILABILITY);
+  const [savingAvailability, setSavingAvailability] = useState(false);
 
   // Form Fields
   const [name, setName] = useState("");
@@ -142,7 +166,6 @@ export default function BusinessProfilePage() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
-  const [operatingHours, setOperatingHours] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -155,30 +178,34 @@ export default function BusinessProfilePage() {
     const loadProfile = async () => {
       setFetching(true);
       try {
-        const response = await apiFetch<{
-          success: boolean;
-          business?: Partial<BusinessProfile>;
-        }>("/business/dashboard");
+        const [profileResponse, availabilityResponse] = await Promise.all([
+          apiFetch<{
+            success: boolean;
+            profile?: Partial<BusinessProfile>;
+          }>("/business/profile"),
+          apiFetch<{ success: boolean; availability: BusinessAvailability[] }>("/business/availability"),
+        ]);
 
-        if (response.business) {
+        if (profileResponse.profile) {
           const loaded: BusinessProfile = {
-            id: response.business.id || DEFAULT_PROFILE.id,
-            name: response.business.name || DEFAULT_PROFILE.name,
-            category: response.business.category || DEFAULT_PROFILE.category,
-            staffSize: response.business.staffSize || DEFAULT_PROFILE.staffSize,
-            email: response.business.email || DEFAULT_PROFILE.email,
-            phone: response.business.phone || DEFAULT_PROFILE.phone,
-            address: response.business.address || DEFAULT_PROFILE.address,
-            description: response.business.description || DEFAULT_PROFILE.description,
-            operatingHours: response.business.operatingHours || DEFAULT_PROFILE.operatingHours,
+            id: profileResponse.profile.id || DEFAULT_PROFILE.id,
+            name: profileResponse.profile.name || DEFAULT_PROFILE.name,
+            category: profileResponse.profile.category || DEFAULT_PROFILE.category,
+            staffSize: profileResponse.profile.staffSize || DEFAULT_PROFILE.staffSize,
+            email: profileResponse.profile.email || DEFAULT_PROFILE.email,
+            phone: profileResponse.profile.phone || DEFAULT_PROFILE.phone,
+            address: profileResponse.profile.address || DEFAULT_PROFILE.address,
+            description: profileResponse.profile.description || DEFAULT_PROFILE.description,
           };
           setProfile(loaded);
           populateForm(loaded);
         } else {
           populateForm(DEFAULT_PROFILE);
         }
+        setAvailability(availabilityResponse.availability ?? DEFAULT_AVAILABILITY);
       } catch (err) {
         console.warn("Could not load profile from backend:", err);
+        toast.error(err instanceof Error ? err.message : "Could not load business settings.");
         populateForm(DEFAULT_PROFILE);
       } finally {
         setFetching(false);
@@ -195,7 +222,6 @@ export default function BusinessProfilePage() {
     setPhone(data.phone);
     setAddress(data.address);
     setDescription(data.description);
-    setOperatingHours(data.operatingHours);
   };
 
   const handleSave = async (e: FormEvent) => {
@@ -215,23 +241,67 @@ export default function BusinessProfilePage() {
       phone: phone.trim(),
       address: address.trim(),
       description: description.trim(),
-      operatingHours: operatingHours.trim(),
     };
 
     try {
       await apiFetch("/business/profile", {
-        method: "PUT",
-        body: JSON.stringify(updated),
-      }).catch(() => {});
+        method: "PATCH",
+        body: JSON.stringify({
+          name: updated.name,
+          category: updated.category,
+          staffSize: updated.staffSize,
+          email: updated.email,
+          phone: updated.phone,
+          address: updated.address,
+          description: updated.description,
+        }),
+      });
 
       setProfile(updated);
       toast.success("Business profile updated successfully!");
-    } catch {
-      toast.error("Failed to update profile.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update profile.");
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSaveAvailability = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingAvailability(true);
+    try {
+      const response = await apiFetch<{ success: boolean; availability: BusinessAvailability[] }>(
+        "/business/availability",
+        { method: "PUT", body: JSON.stringify({ availability }) },
+      );
+      setAvailability(response.availability);
+      toast.success("Business hours saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save business hours.");
+    } finally {
+      setSavingAvailability(false);
+    }
+  };
+
+  const updateAvailabilityDay = (dayOfWeek: number, patch: Partial<BusinessAvailability>) => {
+    setAvailability((current) => current.map((day) =>
+      day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day,
+    ));
+  };
+
+  const businessHoursSummary = WEEKDAYS
+    .map(({ dayOfWeek, label }) => {
+      const day = availability.find((entry) => entry.dayOfWeek === dayOfWeek);
+      return day?.active ? `${label.slice(0, 3)} ${day.startTime}-${day.endTime}` : null;
+    })
+    .filter(Boolean)
+    .join(" · ");
+  const now = new Date();
+  const todayHours = availability.find((day) => day.dayOfWeek === now.getDay());
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const businessOpenNow = Boolean(
+    todayHours?.active && currentTime >= todayHours.startTime && currentTime < todayHours.endTime,
+  );
 
   // Non-blocking guard
   if (loading || !user) {
@@ -239,11 +309,11 @@ export default function BusinessProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -272,8 +342,8 @@ export default function BusinessProfilePage() {
 
         <div className="border-b border-white/10 px-6 py-5">
           <p className="text-xs font-medium text-slate-400">Navigation</p>
-          <h2 className="mt-1 truncate text-base font-semibold text-white">Profile Settings</h2>
-          <p className="mt-1 text-xs text-sky-400">Business Details</p>
+          <h2 className="mt-1 truncate text-base font-semibold text-white">Business Settings</h2>
+          <p className="mt-1 text-xs text-sky-400">Profile &amp; Availability</p>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 pb-6 pt-6">
@@ -336,7 +406,7 @@ export default function BusinessProfilePage() {
 
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                Business Profile
+                Business Settings
               </h1>
               <p className="hidden text-xs text-slate-500 sm:block">
                 Manage your public directory information, location, and operational contact channels.
@@ -409,16 +479,6 @@ export default function BusinessProfilePage() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                              Operating Hours
-                            </label>
-                            <input
-                              type="text"
-                              value={operatingHours}
-                              onChange={(e) => setOperatingHours(e.target.value)}
-                              placeholder="e.g. 08:00 – 17:00 (Mon – Sat)"
-                              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs text-slate-800 outline-none transition focus:border-[#0EA5E9] focus:bg-white focus:ring-4 focus:ring-sky-100 sm:text-sm"
-                            />
                           </div>
                         </div>
 
@@ -513,6 +573,79 @@ export default function BusinessProfilePage() {
                   </button>
                 </div>
               </form>
+
+              <form onSubmit={handleSaveAvailability} className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Business Availability</h2>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Set your recurring public opening hours. Individual staff schedules can be narrower.
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-slate-500">Local business time</span>
+                </div>
+
+                {fetching ? (
+                  <div className="mt-6 animate-pulse space-y-3" role="status" aria-label="Loading business availability">
+                    {WEEKDAYS.map(({ dayOfWeek }) => <div key={dayOfWeek} className="h-11 rounded-lg bg-slate-100" />)}
+                  </div>
+                ) : (
+                  <div className="mt-5 divide-y divide-slate-100">
+                    {WEEKDAYS.map(({ dayOfWeek, label }) => {
+                      const hours = availability.find((day) => day.dayOfWeek === dayOfWeek) ?? {
+                        dayOfWeek,
+                        startTime: "09:00",
+                        endTime: "17:00",
+                        active: false,
+                      };
+                      return (
+                        <div key={dayOfWeek} className="grid gap-3 py-3 sm:grid-cols-[minmax(9rem,1fr)_auto] sm:items-center">
+                          <label className="flex items-center gap-3 text-sm font-semibold text-slate-800">
+                            <input
+                              type="checkbox"
+                              checked={hours.active}
+                              onChange={(event) => updateAvailabilityDay(dayOfWeek, { active: event.target.checked })}
+                              className="h-4 w-4 rounded border-slate-300 text-[#0EA5E9] focus:ring-[#0EA5E9]"
+                            />
+                            {label}
+                          </label>
+                          {hours.active ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="time"
+                                aria-label={`${label} opening time`}
+                                value={hours.startTime}
+                                onChange={(event) => updateAvailabilityDay(dayOfWeek, { startTime: event.target.value })}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#0EA5E9]"
+                              />
+                              <span className="text-xs text-slate-400">to</span>
+                              <input
+                                type="time"
+                                aria-label={`${label} closing time`}
+                                value={hours.endTime}
+                                onChange={(event) => updateAvailabilityDay(dayOfWeek, { endTime: event.target.value })}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#0EA5E9]"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400 sm:text-right">Closed</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="submit"
+                    disabled={savingAvailability || fetching}
+                    className="rounded-xl bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-50"
+                  >
+                    {savingAvailability ? "Saving hours..." : "Save Business Hours"}
+                  </button>
+                </div>
+              </form>
             </div>
 
             {/* Right Column: Live Directory Preview & Account Ownership */}
@@ -523,8 +656,8 @@ export default function BusinessProfilePage() {
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     Live Directory Preview
                   </span>
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                    Open
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${businessOpenNow ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                    {businessOpenNow ? "Open" : "Closed"}
                   </span>
                 </div>
 
@@ -568,7 +701,7 @@ export default function BusinessProfilePage() {
                       </p>
                       <p className="flex items-center gap-2">
                         <span className="text-slate-400"><Icons.Clock /></span>
-                        <span>{operatingHours || "08:00 – 17:00"}</span>
+                        <span>{businessHoursSummary || "Hours not set"}</span>
                       </p>
                     </div>
 

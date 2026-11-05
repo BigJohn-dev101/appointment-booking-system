@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  acceptStaffInvitation,
   registerCustomer,
   registerProvider,
   registerBusiness,
@@ -21,6 +22,7 @@ const router: ReturnType<typeof Router> = Router();
 router.post("/register/customer", registerCustomer);
 router.post("/register/provider", registerProvider);
 router.post("/register/business", registerBusiness);
+router.post("/accept-staff-invitation", acceptStaffInvitation);
 
 router.post("/login", login);
 router.post("/logout", logout);

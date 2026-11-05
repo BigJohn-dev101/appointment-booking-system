@@ -80,6 +80,7 @@ export type BusinessAppointment = {
   staffName: string | null;
   status: AppointmentStatus;
   price?: number;
+  durationMinutes?: number;
 };
 
 type NavItem = {
@@ -95,59 +96,6 @@ const navItems: NavItem[] = [
   { label: "Staff", icon: Icons.Staff, path: "/dashboard/business/staff" },
   { label: "Subscription", icon: Icons.Subscription, path: "/dashboard/business/package" },
   { label: "Profile", icon: Icons.Profile, path: "/dashboard/business/profile" },
-];
-
-const DEFAULT_APPOINTMENTS: BusinessAppointment[] = [
-  {
-    id: "appt-1",
-    time: new Date(Date.now() - 3600000).toISOString(),
-    customerName: "Alice Henderson",
-    customerPhone: "+27 82 555 1234",
-    service: "Standard Haircut",
-    staffName: "Dr. Rachel Green",
-    status: "CONFIRMED",
-    price: 180,
-  },
-  {
-    id: "appt-2",
-    time: new Date(Date.now() + 7200000).toISOString(),
-    customerName: "Robert Chen",
-    customerPhone: "+27 83 777 9988",
-    service: "Beard Sculpt & Trim",
-    staffName: "Dr. Alex Carter",
-    status: "CONFIRMED",
-    price: 100,
-  },
-  {
-    id: "appt-3",
-    time: new Date(Date.now() + 14400000).toISOString(),
-    customerName: "Emily Watson",
-    customerPhone: "+27 84 999 0011",
-    service: "Haircut & Beard Combo",
-    staffName: "Dr. Jane Wilson",
-    status: "CONFIRMED",
-    price: 250,
-  },
-  {
-    id: "appt-4",
-    time: new Date(Date.now() - 86400000).toISOString(),
-    customerName: "Marcus Aurelius",
-    customerPhone: "+27 81 222 3344",
-    service: "Standard Haircut",
-    staffName: "Dr. Rachel Green",
-    status: "COMPLETED",
-    price: 180,
-  },
-  {
-    id: "appt-5",
-    time: new Date(Date.now() - 172800000).toISOString(),
-    customerName: "Lucius Verus",
-    customerPhone: "+27 82 333 4455",
-    service: "Beard Sculpt & Trim",
-    staffName: "Dr. Alex Carter",
-    status: "CANCELLED",
-    price: 100,
-  },
 ];
 
 export default function BusinessAppointments() {
@@ -175,20 +123,13 @@ export default function BusinessAppointments() {
       try {
         const response = await apiFetch<{
           success: boolean;
-          todayAppointments?: BusinessAppointment[];
           appointments?: BusinessAppointment[];
-        }>("/business/dashboard");
+        }>("/business/appointments");
 
-        if (response.todayAppointments && response.todayAppointments.length > 0) {
-          setAppointments(response.todayAppointments);
-        } else if (response.appointments && response.appointments.length > 0) {
-          setAppointments(response.appointments);
-        } else {
-          setAppointments(DEFAULT_APPOINTMENTS);
-        }
+        setAppointments(response.appointments ?? []);
       } catch (err) {
         console.warn("Could not load appointments from backend:", err);
-        setAppointments(DEFAULT_APPOINTMENTS);
+        toast.error(err instanceof Error ? err.message : "Could not load appointments.");
       } finally {
         setFetching(false);
       }
@@ -223,15 +164,15 @@ export default function BusinessAppointments() {
       await apiFetch(`/business/appointments/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
-      }).catch(() => {});
+      });
 
       setAppointments((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
       );
 
       toast.success(`Status updated to ${newStatus.replace("_", " ")}.`);
-    } catch {
-      toast.error("Failed to update status.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update status.");
     }
   };
 
@@ -278,11 +219,11 @@ export default function BusinessAppointments() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}

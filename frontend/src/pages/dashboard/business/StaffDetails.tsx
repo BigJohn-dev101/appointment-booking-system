@@ -4,9 +4,6 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../../hooks/useAuth";
 import { apiFetch } from "../../../services/api";
 
-const ACCENT_FROM = "#0EA5E9";
-const ACCENT_TO = "#38BDF8";
-
 type ServiceItem = {
   id: string;
   name: string;

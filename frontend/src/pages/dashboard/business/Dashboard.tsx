@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../hooks/useAuth";
-import { apiFetch } from "../../../services/api";
+import { useBusinessDashboard } from "../../../context/BusinessDashboardContext";
+import { formatBusinessName } from "../../../lib/formatBusinessName";
 
 const ACCENT_FROM = "#0EA5E9";
 const ACCENT_TO = "#38BDF8";
@@ -68,50 +69,6 @@ const Icons = {
   ),
 };
 
-type BusinessDashboardResponse = {
-  success: boolean;
-  business: {
-    id: string;
-    name: string;
-    category: string | null;
-    staffSize: string | null;
-    email: string | null;
-    phone: string | null;
-    address: string | null;
-  } | null;
-  stats: {
-    todayAppointments: number;
-    todayRemaining: number;
-    staffCount: number;
-    maxStaff: number | null;
-    activeServicesCount: number;
-    monthAppointments: number;
-  };
-  todayAppointments: Array<{
-    id: string;
-    time: string;
-    customerName: string;
-    service: string;
-    staffName: string | null;
-    status: string;
-  }>;
-  staff: Array<{
-    id: string;
-    name: string;
-    role: string;
-    appointmentsToday: number;
-    status: string;
-  }>;
-  subscription: {
-    tier: string;
-    status: string;
-    paymentStatus: string;
-    maxStaff: number | null;
-    dailyAppointmentLimit: number | null;
-    nextBillingDate: string | null;
-  } | null;
-};
-
 type NavItem = {
   label: string;
   icon: React.ComponentType;
@@ -131,41 +88,16 @@ const navItems: NavItem[] = [
 export default function BusinessDashboard() {
   const navigate = useNavigate();
   const { user, loading, logout } = useAuth();
-
+  const { data: dashboardData, loading: fetching } = useBusinessDashboard();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [business, setBusiness] = useState<BusinessDashboardResponse["business"]>(null);
-  const [stats, setStats] = useState<BusinessDashboardResponse["stats"] | null>(null);
-  const [appointments, setAppointments] = useState<BusinessDashboardResponse["todayAppointments"]>([]);
-  const [staff, setStaff] = useState<BusinessDashboardResponse["staff"]>([]);
-  const [subscription, setSubscription] = useState<BusinessDashboardResponse["subscription"]>(null);
-  const [fetching, setFetching] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-
-    if (user.role !== "BUSINESS_OWNER") {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    const fetchDashboard = async () => {
-      setFetching(true);
-      try {
-        const response = await apiFetch<BusinessDashboardResponse>("/business/dashboard");
-        if (response.business) setBusiness(response.business);
-        if (response.stats) setStats(response.stats);
-        if (response.todayAppointments) setAppointments(response.todayAppointments);
-        if (response.staff) setStaff(response.staff);
-        if (response.subscription) setSubscription(response.subscription);
-      } catch (error) {
-        console.warn("Could not load dashboard data from backend:", error);
-      } finally {
-        setFetching(false);
-      }
-    };
-
-    void fetchDashboard();
-  }, [user, navigate]);
+  const rawBusiness = dashboardData?.business ?? null;
+  const business = rawBusiness
+    ? { ...rawBusiness, name: formatBusinessName(rawBusiness.name) }
+    : null;
+  const stats = dashboardData?.stats ?? null;
+  const appointments = dashboardData?.todayAppointments ?? [];
+  const staff = dashboardData?.staff ?? [];
+  const subscription = dashboardData?.subscription ?? null;
 
   // Non-blocking guard
   if (loading || !user) {
@@ -177,11 +109,11 @@ export default function BusinessDashboard() {
     : "Basic";
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
+    <div className="business-legacy-page min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="business-mobile-overlay fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
