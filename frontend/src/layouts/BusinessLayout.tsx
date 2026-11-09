@@ -112,7 +112,7 @@ export default function BusinessLayout() {
           <p className="mt-1 text-xs text-sky-400">Business Owner</p>
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-hidden px-3 py-3">
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3">
           {navItems.map((item) => {
             const isActive = item.path === "/dashboard/business"
               ? location.pathname === item.path
