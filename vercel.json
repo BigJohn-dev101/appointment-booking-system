@@ -3,7 +3,8 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "express"
+      "framework": "express",
+      "buildCommand": "pnpm exec prisma generate --schema prisma/schema.prisma"
     },
     "frontend": {
       "root": "frontend",
