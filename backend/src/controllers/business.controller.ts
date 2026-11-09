@@ -477,16 +477,11 @@ export const inviteBusinessStaff = async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ success: false, message: "Business profile not found" });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: "An account already exists for this email address" });
-    }
-
     const nameParts = fullName.split(/\s+/);
     const token = createStaffInvitationToken();
     const now = new Date();
     const invitation = await prisma.$transaction(async (tx) => {
-      const [staffCount, pendingCount, activeSubscription, existingInvitation] = await Promise.all([
+      const [staffCount, pendingCount, activeSubscription, existingUser, existingInvitation] = await Promise.all([
         tx.businessStaff.count({ where: { businessId: business.id } }),
         tx.staffInvitation.count({
           where: { businessId: business.id, acceptedAt: null, expiresAt: { gt: now } },
@@ -496,13 +491,24 @@ export const inviteBusinessStaff = async (req: AuthenticatedRequest, res: Respon
           orderBy: { createdAt: "desc" },
           include: { package: true },
         }),
+        tx.user.findFirst({
+          where: { OR: phone ? [{ email }, { phone }] : [{ email }] },
+          select: { email: true, phone: true },
+        }),
         tx.staffInvitation.findFirst({
-          where: { businessId: business.id, email, acceptedAt: null, expiresAt: { gt: now } },
-          select: { id: true },
+          where: {
+            OR: phone ? [{ email }, { phone }] : [{ email }],
+            acceptedAt: null,
+            expiresAt: { gt: now },
+          },
+          select: { email: true, phone: true },
         }),
       ]);
 
-      if (existingInvitation) throw new Error("STAFF_INVITATION_EXISTS");
+      if (existingUser?.email === email) throw new Error("STAFF_EMAIL_EXISTS");
+      if (phone && existingUser?.phone === phone) throw new Error("STAFF_PHONE_EXISTS");
+      if (existingInvitation?.email === email) throw new Error("STAFF_INVITATION_EXISTS");
+      if (phone && existingInvitation?.phone === phone) throw new Error("STAFF_PHONE_INVITATION_EXISTS");
       if (serviceIds.length > 0) {
         const validServices = await tx.service.count({
           where: { businessId: business.id, id: { in: serviceIds } },
@@ -555,8 +561,17 @@ export const inviteBusinessStaff = async (req: AuthenticatedRequest, res: Respon
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "STAFF_EMAIL_EXISTS") {
+      return res.status(409).json({ success: false, message: "An account already exists for this email address" });
+    }
+    if (error instanceof Error && error.message === "STAFF_PHONE_EXISTS") {
+      return res.status(409).json({ success: false, message: "An account already exists for this phone number" });
+    }
     if (error instanceof Error && error.message === "STAFF_INVITATION_EXISTS") {
       return res.status(409).json({ success: false, message: "A pending invitation already exists for this email" });
+    }
+    if (error instanceof Error && error.message === "STAFF_PHONE_INVITATION_EXISTS") {
+      return res.status(409).json({ success: false, message: "A pending invitation already exists for this phone number" });
     }
     if (error instanceof Error && error.message === "STAFF_LIMIT_REACHED") {
       return res.status(409).json({ success: false, message: "Your business has reached its staff limit" });
