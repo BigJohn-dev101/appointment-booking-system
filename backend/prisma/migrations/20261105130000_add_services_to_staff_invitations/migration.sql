@@ -1,0 +1,2 @@
+ALTER TABLE "StaffInvitation"
+ADD COLUMN "serviceIds" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

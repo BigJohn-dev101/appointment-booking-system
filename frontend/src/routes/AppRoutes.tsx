@@ -2,6 +2,8 @@ import { Route, Routes, Navigate } from "react-router-dom";
 
 import PublicLayout from "../layouts/PublicLayout";
 import ProviderLayout from "../layouts/ProviderLayout";
+import BusinessLayout from "../layouts/BusinessLayout";
+import StaffLayout from "../layouts/StaffLayout";
 import CustomerLayout from "../layouts/CustomerLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleRoute } from "./RoleRoute";
@@ -15,6 +17,7 @@ import Contact from "../pages/public/Contact";
 import VerifyEmail from "../pages/public/VerifyEmail";
 import ForgotPassword from "../pages/public/ForgotPassword";
 import ResetPassword from "../pages/public/ResetPassword";
+import AcceptStaffInvitation from "../pages/public/AcceptStaffInvitation";
 
 // Provider discovery
 import Providers from "../pages/public/providers/Providers";
@@ -54,7 +57,9 @@ import BusinessProfilePage from "../pages/dashboard/business/Profile";
 import BusinessAnalytics from "../pages/dashboard/business/Analytics";
 
 // Other dashboards
-import StaffDashboard from "../pages/dashboard/staff/Dashboard";
+import StaffOverview from "../pages/dashboard/staff/Overview";
+import StaffAppointments from "../pages/dashboard/staff/Appointments";
+import StaffProfile from "../pages/dashboard/staff/Profile";
 import AdminDashboard from "../pages/dashboard/admin/Dashboard";
 
 export default function AppRoutes() {
@@ -68,6 +73,7 @@ export default function AppRoutes() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/accept-staff-invitation" element={<AcceptStaffInvitation />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/providers" element={<Providers />} />
@@ -133,122 +139,23 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessDashboard />
+              <BusinessLayout />
             </RoleRoute>
           </ProtectedRoute>
         }
-      />
-
-      {/* Business owner pages */}
-      <Route
-        path="/dashboard/business/services"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessServices />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/staff"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessStaff />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/staff/:id"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <StaffDetails />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/appointments"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessAppointments />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/package"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessPackage />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/analytics"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessAnalytics />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/package/plans"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <UpgradePlans />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/package/checkout"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <PackageCheckout />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/package/success"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <PackageSuccess />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/dashboard/business/profile"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={["BUSINESS_OWNER"]}>
-              <BusinessProfilePage />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
+      >
+        <Route index element={<BusinessDashboard />} />
+        <Route path="services" element={<BusinessServices />} />
+        <Route path="staff" element={<BusinessStaff />} />
+        <Route path="staff/:id" element={<StaffDetails />} />
+        <Route path="appointments" element={<BusinessAppointments />} />
+        <Route path="package" element={<BusinessPackage />} />
+        <Route path="analytics" element={<BusinessAnalytics />} />
+        <Route path="package/plans" element={<UpgradePlans />} />
+        <Route path="package/checkout" element={<PackageCheckout />} />
+        <Route path="package/success" element={<PackageSuccess />} />
+        <Route path="profile" element={<BusinessProfilePage />} />
+      </Route>
 
       {/* Business staff dashboard */}
       <Route
@@ -256,11 +163,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={["BUSINESS_STAFF"]}>
-              <StaffDashboard />
+              <StaffLayout />
             </RoleRoute>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<StaffOverview />} />
+        <Route path="appointments" element={<StaffAppointments />} />
+        <Route path="profile" element={<StaffProfile />} />
+      </Route>
 
       {/* Admin dashboard */}
       <Route

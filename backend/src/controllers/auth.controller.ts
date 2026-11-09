@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
+import { hashStaffInvitationToken } from "../lib/staff-invitation.js";
 import {
   issueOtp,
   issuePasswordResetOtp,
@@ -1357,5 +1358,116 @@ export const resetPassword = async (req: Request, res: Response) => {
       success: false,
       message: "Something went wrong while resetting your password",
     });
+  }
+};
+
+export const acceptStaffInvitation = async (req: Request, res: Response) => {
+  const { token, password, confirmPassword } = req.body as Record<string, unknown>;
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ success: false, message: "This invitation link is invalid or expired" });
+  }
+  if (typeof password !== "string" || typeof confirmPassword !== "string") {
+    return res.status(400).json({ success: false, message: "Password and confirmation are required" });
+  }
+  if (password !== confirmPassword) {
+    return res.status(400).json({ success: false, message: "Passwords do not match" });
+  }
+
+  const passwordError = getPasswordComplexityError(password);
+  if (passwordError) {
+    return res.status(400).json({ success: false, message: passwordError });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const tokenHash = hashStaffInvitationToken(token);
+    await prisma.$transaction(async (tx) => {
+      const invitation = await tx.staffInvitation.findUnique({ where: { tokenHash } });
+      const now = new Date();
+      if (!invitation || invitation.acceptedAt || invitation.expiresAt <= now) {
+        throw new Error("STAFF_INVITATION_INVALID");
+      }
+
+      if (await tx.user.findUnique({ where: { email: invitation.email }, select: { id: true } })) {
+        throw new Error("STAFF_INVITATION_ACCOUNT_EXISTS");
+      }
+
+      const invitedServices = invitation.serviceIds.length > 0
+        ? await tx.service.findMany({
+            where: { businessId: invitation.businessId, id: { in: invitation.serviceIds } },
+            select: { id: true, active: true, staffAssignments: { select: { id: true } } },
+          })
+        : [];
+      if (invitedServices.length !== invitation.serviceIds.length) {
+        throw new Error("STAFF_INVITATION_SERVICES_CHANGED");
+      }
+
+      const claimed = await tx.staffInvitation.updateMany({
+        where: { id: invitation.id, acceptedAt: null, expiresAt: { gt: now } },
+        data: { acceptedAt: now },
+      });
+      if (claimed.count !== 1) {
+        throw new Error("STAFF_INVITATION_INVALID");
+      }
+
+      const user = await tx.user.create({
+        data: {
+          email: invitation.email,
+          passwordHash,
+          firstName: invitation.firstName,
+          lastName: invitation.lastName,
+          phone: invitation.phone,
+          role: "BUSINESS_STAFF",
+          isVerified: true,
+        },
+      });
+      const staff = await tx.businessStaff.create({
+        data: {
+          businessId: invitation.businessId,
+          userId: user.id,
+          title: invitation.title,
+        },
+      });
+      if (invitation.serviceIds.length > 0) {
+        await tx.staffService.createMany({
+          data: invitation.serviceIds.map((serviceId) => ({ staffId: staff.id, serviceId })),
+        });
+        const newlyAssignedServiceIds = invitedServices
+          .filter((service) => !service.active && service.staffAssignments.length === 0)
+          .map((service) => service.id);
+        if (newlyAssignedServiceIds.length > 0) {
+          await tx.service.updateMany({
+            where: { businessId: invitation.businessId, id: { in: newlyAssignedServiceIds } },
+            data: { active: true },
+          });
+        }
+      }
+    }, { maxWait: 15_000, timeout: 20_000 });
+
+    return res.status(201).json({
+      success: true,
+      message: "Your staff account is ready. You can now sign in.",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "STAFF_INVITATION_INVALID") {
+      return res.status(400).json({ success: false, message: "This invitation link is invalid or expired" });
+    }
+    if (error instanceof Error && error.message === "STAFF_INVITATION_ACCOUNT_EXISTS") {
+      return res.status(409).json({ success: false, message: "An account already exists for this email address" });
+    }
+    if (error instanceof Error && error.message === "STAFF_INVITATION_SERVICES_CHANGED") {
+      return res.status(409).json({ success: false, message: "A selected service is no longer available. Ask the business owner to send a new invitation." });
+    }
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      return res.status(409).json({ success: false, message: "An account already exists for this email or phone number" });
+    }
+
+    if (error && typeof error === "object" && "code" in error && error.code === "P2028") {
+      console.error("Staff invitation transaction could not start:", error);
+      return res.status(503).json({ success: false, message: "The server is temporarily busy. Please try again." });
+    }
+
+    console.error("Staff invitation acceptance error:", error);
+    return res.status(500).json({ success: false, message: "Unable to accept this invitation" });
   }
 };

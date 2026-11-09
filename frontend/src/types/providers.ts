@@ -4,6 +4,8 @@ export type ProviderService = {
   description: string;
   duration: number;
   price: number | null;
+  assigned?: boolean;
+  bookable?: boolean;
 };
 
 export type Provider = {

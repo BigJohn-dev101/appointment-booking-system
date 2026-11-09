@@ -77,3 +77,23 @@ export async function sendPasswordResetEmail(
     `,
   );
 }
+
+export async function sendStaffInvitationEmail(
+  to: string,
+  firstName: string,
+  businessName: string,
+  title: string,
+  token: string,
+): Promise<void> {
+  const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+  const invitationUrl = new URL("/accept-staff-invitation", frontendOrigin);
+  invitationUrl.searchParams.set("token", token);
+  const link = invitationUrl.toString();
+
+  await sendEmail(
+    to,
+    `Invitation to join ${businessName}`,
+    `Hi ${firstName}, ${businessName} invited you to join as ${title}. Set your password using this link: ${link}. The link expires in 7 days.`,
+    `<p>Hi ${escapeHtml(firstName)},</p><p><strong>${escapeHtml(businessName)}</strong> invited you to join as ${escapeHtml(title)}.</p><p><a href="${escapeHtml(link)}">Accept invitation and set your password</a></p><p>This link expires in 7 days. If you weren't expecting this invitation, you can ignore this email.</p>`,
+  );
+}
