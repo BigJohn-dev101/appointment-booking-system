@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { verifyEmailOtp } from "../services/auth";
 
@@ -44,6 +45,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -92,9 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setLoading(false);
-      window.location.href = "/login";
+      navigate("/login", { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     void refreshUser();
