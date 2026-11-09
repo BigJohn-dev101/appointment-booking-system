@@ -4,6 +4,7 @@ import PublicLayout from "../layouts/PublicLayout";
 import ProviderLayout from "../layouts/ProviderLayout";
 import BusinessLayout from "../layouts/BusinessLayout";
 import StaffLayout from "../layouts/StaffLayout";
+import CustomerLayout from "../layouts/CustomerLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleRoute } from "./RoleRoute";
 
@@ -29,8 +30,11 @@ import ProviderRegister from "../pages/public/register/ProviderRegister";
 import BusinessRegister from "../pages/public/register/BusinessRegister";
 
 // Customer dashboard
-import ClientDashboard from "../pages/dashboard/customer/Dashboard";
-
+import CustomerDashboard from "../pages/dashboard/customer/Dashboard";
+import CustomerBook from "../pages/dashboard/customer/Book";
+import CustomerAppointments from "../pages/dashboard/customer/Appointments";
+import CustomerAppointmentDetails from "../pages/dashboard/customer/AppointmentDetails";
+import CustomerProfile from "../pages/dashboard/customer/Profile";
 // Sole provider dashboard
 import ProviderDashboard from "../pages/dashboard/provider/Dashboard";
 import Services from "../pages/dashboard/provider/Services";
@@ -116,11 +120,17 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={["CUSTOMER"]}>
-              <ClientDashboard />
+              <CustomerLayout />
             </RoleRoute>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<CustomerDashboard />} />
+        <Route path="book" element={<CustomerBook />} />
+        <Route path="appointments" element={<CustomerAppointments />} />
+        <Route path="appointments/:id" element={<CustomerAppointmentDetails />} />
+        <Route path="profile" element={<CustomerProfile />} />
+      </Route>
 
       {/* Business owner dashboard */}
       {/* --- PROTECTED BUSINESS DASHBOARD --- */}

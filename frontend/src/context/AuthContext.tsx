@@ -38,6 +38,7 @@ type AuthContextValue = {
   verifyEmail: (email: string, code: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (user: AuthUser) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -55,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const updateUser = useCallback((updatedUser: AuthUser) => {
+    setUser(updatedUser);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -104,8 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmail,
       logout,
       refreshUser,
+      updateUser,
     }),
-    [user, loading, login, verifyEmail, logout, refreshUser],
+    [user, loading, login, verifyEmail, logout, refreshUser, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
