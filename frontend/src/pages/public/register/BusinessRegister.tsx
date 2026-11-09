@@ -118,7 +118,7 @@ export default function BusinessRegister() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/auth/register/business",
+        "/api/auth/register/business",
         {
           method: "POST",
           headers: {
